@@ -142,6 +142,16 @@ or read-only DB/GitHub GET requests with validated arguments; the GitHub token s
 Don't give the agent `Bash` with a permission allowlist instead: in testing the CLI still let commands like
 `python3 -c …` and `gh auth token` through.
 
+## Ask Claude
+
+The issue detail has an **Ask Claude** box for free-form questions with the issue (thread, linked PRs, project
+fields, earlier analysis/investigation and earlier Q&A) as context. *Issue only* is a quick single call; *+ Code &
+history* uses the same sandboxed read-only agent as `investigate` to look at the checkout, git history and PRs.
+Answers are stored in `issue_questions`; prompts are `prompts/ask.md` and `prompts/ask-code.md` (model: `ASK_MODEL`).
+
+Analyze, Investigate and Ask run as server-side background jobs that the UI polls (`/api/jobs/:id`), so long agent
+runs don't hit request timeouts.
+
 ## Project layout
 
 ```
@@ -153,6 +163,7 @@ src/
   app-server.ts       HTTP API + UI server (used by `bun run ui` and the desktop app)
   analysis/           Claude triage: prompt building, runner
   investigate.ts      agentic investigation; mcp/investigate-tools.ts = its read-only tools
+  ask.ts              free-form questions about an issue (thread-only or with code access)
   actions.ts          closing issues on GitHub (+ audit log)
   claude.ts           headless `claude -p` wrapper (restricted mode, JSON schema)
   ui/                 React UI
@@ -178,6 +189,7 @@ scripts/              desktop pre-build + install
 | `issue_analysis`   | latest Claude analysis per issue (+ model, prompt version, cost)                 |
 | `issue_investigations` | latest agent investigation: verdict, evidence, proposed action, draft comment, session id |
 | `issue_actions`    | audit log of issues closed from this tool                                        |
+| `issue_questions`  | Ask Claude questions and answers per issue                                       |
 
 Example:
 

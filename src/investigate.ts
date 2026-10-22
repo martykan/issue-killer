@@ -56,6 +56,24 @@ const MCP_SERVER = 'ik';
 const MCP_TOOLS = ['git_log', 'git_show', 'git_file_at', 'search_issues', 'get_issue', 'get_pull_request', 'search_pull_requests'];
 const ALLOWED_TOOLS = ['Read', 'Grep', 'Glob', ...MCP_TOOLS.map(t => `mcp__${MCP_SERVER}__${t}`)];
 
+/**
+ * Sandboxed, read-only toolbox for agents working on the trezor-suite checkout (investigation, code questions):
+ * file tools confined to the checkout + our MCP server for git, PRs and the issue DB. No shell.
+ */
+export function readOnlyAgentTools(repoPath: string, dbPath: string) {
+    return {
+        cwd: repoPath,
+        tools: ['Read', 'Grep', 'Glob'],
+        allowedTools: ALLOWED_TOOLS,
+        mcpServers: {
+            [MCP_SERVER]: {
+                command: process.execPath,
+                args: [investigateMcpScript(), '--repo', repoPath, '--db', resolve(dbPath)],
+            },
+        },
+    };
+}
+
 export function investigationPromptVersion() {
     return createHash('sha256')
         .update(readFileSync(promptPath('investigate.md'), 'utf8'))
@@ -108,15 +126,7 @@ export async function investigateIssue(
         prompt,
         schema: SCHEMA,
         model,
-        cwd: repoPath,
-        tools: ['Read', 'Grep', 'Glob'],
-        allowedTools: ALLOWED_TOOLS,
-        mcpServers: {
-            [MCP_SERVER]: {
-                command: process.execPath,
-                args: [investigateMcpScript(), '--repo', repoPath, '--db', resolve(opts.dbPath)],
-            },
-        },
+        ...readOnlyAgentTools(repoPath, opts.dbPath),
         persistSession: true,
         maxBudgetUsd: 3,
         timeoutMs: 15 * 60_000,

@@ -79,3 +79,24 @@ export function useFetch<T>(url: string | null, reloadKey?: unknown): { data: T 
     }, [url, reloadKey]);
     return state;
 }
+
+/**
+ * Starts a server-side background job (POST → { jobId }) and polls until it finishes; resolves with its result.
+ * Used for Claude calls, which can outlast what the webview keeps a request open for.
+ */
+export async function runJob<T>(url: string, body?: unknown): Promise<T> {
+    const res = await fetch(url, {
+        method: 'POST',
+        ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+    });
+    const started = await res.json();
+    if (!res.ok) throw new Error(started.error ?? `HTTP ${res.status}`);
+    for (;;) {
+        await new Promise(r => setTimeout(r, 1500));
+        const poll = await fetch(`/api/jobs/${started.jobId}`);
+        const job = await poll.json();
+        if (!poll.ok) throw new Error(job.error ?? `HTTP ${poll.status}`);
+        if (job.status === 'done') return job.result as T;
+        if (job.status === 'error') throw new Error(job.error);
+    }
+}

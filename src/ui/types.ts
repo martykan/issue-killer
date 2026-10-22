@@ -185,6 +185,19 @@ export type IssueDetail = Omit<IssueSummary, 'labels' | 'assignees' | 'analysis'
     investigation: Investigation | null;
     actions: IssueAction[];
     projects: { title: string; url: string; fields: Record<string, string> }[];
+    questions: Question[];
+};
+
+export type Question = {
+    id: number;
+    question: string;
+    answer: string;
+    mode: 'thread' | 'code';
+    model: string;
+    sessionId: string | null;
+    costUsd: number | null;
+    durationMs: number | null;
+    askedAt: string;
 };
 
 export type SyncStatus = {

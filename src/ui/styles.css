@@ -646,11 +646,12 @@ kbd {
 .analysis.dim {
     opacity: 0.6;
 }
-.empty-analysis {
-    display: flex;
-    gap: 10px;
-    align-items: center;
+/* Analysis / investigation panels before they have a result: same layout, neutral edge. */
+.analysis.empty-panel,
+.investigation.empty-panel {
     border-left-color: var(--border);
+    padding-top: 8px;
+    padding-bottom: 8px;
 }
 .analysis-head {
     display: flex;
@@ -696,6 +697,7 @@ kbd {
     border-radius: 6px;
     padding: 10px 14px;
     margin: 12px 0;
+    background: var(--bg-subtle);
 }
 .investigation p {
     margin: 6px 0;
@@ -1421,4 +1423,55 @@ kbd {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* Ask Claude */
+.ask {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    background: var(--bg-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.qa {
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+.qa .markdown {
+    padding: 0;
+}
+.qa-question {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.qa-question::before {
+    content: 'Q  ';
+    color: var(--muted);
+}
+.qa.pending .spinner {
+    display: inline-block;
+    vertical-align: -1px;
+}
+.qa-meta code {
+    font-size: 11px;
+}
+.ask-input {
+    font: inherit;
+    color: inherit;
+    width: 100%;
+    resize: vertical;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 0.5px solid var(--control-border);
+    background: var(--bg);
+}
+.ask-actions {
+    align-items: center;
+}
+.ask .pill {
+    text-align: left;
 }
