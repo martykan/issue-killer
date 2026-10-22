@@ -107,9 +107,7 @@ is shown in a system WebView with native menus (copy/paste work), a unified titl
 Links to GitHub open in the default browser.
 
 ```sh
-# one-time: Electrobun 2 builds through Hutch (installs into ~/.hutch)
-npx electrobun@2.0.4 --help
-
+# Electrobun 2 builds through Hutch; the scripts fetch it via `npx electrobun@2.0.4` (cached in ~/.hutch)
 bun run desktop:install                   # build + install into ~/Applications + launch
 bun run desktop:build                     # only build → build/stable-macos-arm64/Issue Killer.app
 bun run desktop                           # dev build + launch
