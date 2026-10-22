@@ -11,7 +11,6 @@ type Props = {
     labelCounts: { label: string; n: number }[];
 };
 
-const isConnectLabel = (name: string) => /^connect/i.test(name);
 
 // Signals grouped by what you'd do about them; unknown keys land in "Other".
 const SIGNAL_GROUPS: { title: string; keys: string[] }[] = [
@@ -22,7 +21,7 @@ const SIGNAL_GROUPS: { title: string; keys: string[] }[] = [
 ];
 
 // Params that aren't filters (view state) – never shown as chips.
-const NON_FILTER_PARAMS = new Set(['state', 'sort', 'page', 'issue', 'view', 'tview', 'team_role']);
+const NON_FILTER_PARAMS = new Set(['state', 'sort', 'page', 'issue', 'view', 'tview', 'bteam', 'pteam', 'team_role']);
 
 export function Sidebar({ meta, params, update, labelCounts }: Props) {
     const urlQuery = params.get('q') ?? '';
@@ -230,7 +229,7 @@ function describeFilters(params: URLSearchParams, meta: Meta | null): { key: str
                 label = `Claude owner: ${value}`;
                 break;
             case 'rel':
-                label = `Connect relevance: ${value}`;
+                label = `my team relevance: ${value}`;
                 break;
             default:
                 label = `${human(key)}: ${human(value)}`;
@@ -327,7 +326,12 @@ function LabelFilters({
     const [filter, setFilter] = useState('');
     const [showAll, setShowAll] = useState(false);
     const selected = params.getAll('label');
-    const connectLabels = useMemo(() => meta?.labels.map(l => l.name).filter(isConnectLabel) ?? [], [meta]);
+    // Shortcut: labels named after your team (e.g. suite-wallet → "wallet*"), if any.
+    const teamKeyword = meta?.settings.myTeam?.replace(/^suite-/, '').toLowerCase() ?? '';
+    const teamLabels = useMemo(
+        () => (teamKeyword ? (meta?.labels.map(l => l.name).filter(n => n.toLowerCase().startsWith(teamKeyword)) ?? []) : []),
+        [meta, teamKeyword],
+    );
 
     const rows = useMemo(() => {
         const counts = new Map(labelCounts.map(c => [c.label, c.n]));
@@ -343,18 +347,20 @@ function LabelFilters({
         <>
             <div className="label-tools">
                 <input className="search small" placeholder="Filter labels" value={filter} onChange={e => setFilter(e.target.value)} />
-                <button
-                    className="link small"
-                    onClick={() =>
-                        update(p => {
-                            p.delete('label');
-                            for (const l of connectLabels) p.append('label', l);
-                        })
-                    }
-                    title={`Any of: ${connectLabels.join(', ')}`}
-                >
-                    connect*
-                </button>
+                {teamLabels.length > 0 && (
+                    <button
+                        className="link small"
+                        onClick={() =>
+                            update(p => {
+                                p.delete('label');
+                                for (const l of teamLabels) p.append('label', l);
+                            })
+                        }
+                        title={`Any of: ${teamLabels.join(', ')}`}
+                    >
+                        {teamKeyword}*
+                    </button>
+                )}
             </div>
             <div className="label-list">
                 {visible.map(l => (

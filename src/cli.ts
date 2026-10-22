@@ -2,6 +2,8 @@ import { parseArgs } from 'node:util';
 import { closeIssue, closeRequestFromInvestigation } from './actions.ts';
 import { analyzeBatch, DEFAULT_MODEL } from './analysis/run.ts';
 import { DEFAULT_DB_PATH, getState, openDb } from './db.ts';
+import { runChecks } from './doctor.ts';
+import { getSettings, type Settings, updateSettings } from './settings.ts';
 import { DEFAULT_INVESTIGATE_MODEL, DEFAULT_REPO_PATH, investigateBatch } from './investigate.ts';
 import { GitHubClient, resolveToken } from './github.ts';
 import { syncRepo } from './sync.ts';
@@ -15,6 +17,8 @@ Commands:
             Read-only: it proposes closing (with a draft comment); you close from the UI.
   close-proposed  List issues the agent proposes to close (dry run); with --execute, close them on GitHub
   status    Show what's in the local DB
+  doctor    Check that gh / claude / git are installed and authenticated, and data is synced
+  settings  Show or change preferences: --my-team <github-team-slug> --my-project-team "<project Team value>"
 
 Options:
   --repo <owner/name>   Repository (default: trezor/trezor-suite)
@@ -26,7 +30,7 @@ sync:
   --project <n>         Org project (v2) number to sync, repeatable; remembered for later syncs (needs read:project)
 
 analyze:
-  --filter <query>      UI-style filter, e.g. "team=suite-connect&signal=stale" (default: all open issues)
+  --filter <query>      UI-style filter, e.g. "team=suite-wallet&signal=stale" (default: all open issues)
   --issue <n>           Analyze specific issue(s), repeatable; ignores --filter
   --limit <n>           Analyze at most n issues
   --concurrency <n>     Parallel claude processes (default: 4)
@@ -65,6 +69,8 @@ const { values, positionals } = parseArgs({
         'dry-run': { type: 'boolean', default: false },
         'min-confidence': { type: 'string', default: 'high' },
         execute: { type: 'boolean', default: false },
+        'my-team': { type: 'string' },
+        'my-project-team': { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
     },
 });
@@ -160,6 +166,29 @@ switch (command) {
     case 'status':
         printStatus();
         break;
+    case 'doctor': {
+        const checks = await runChecks(db, { repoPath: values['repo-path'] });
+        const icon = { ok: '✓', warn: '!', error: '✗' } as const;
+        for (const c of checks) {
+            console.log(`${icon[c.status]} ${c.label.padEnd(26)} ${c.detail}`);
+            if (c.fix) console.log(`  ${''.padEnd(26)} → ${c.fix}`);
+        }
+        const errors = checks.filter(c => c.status === 'error').length;
+        console.log(errors ? `\n${errors} problem(s) to fix.` : '\nAll required checks passed.');
+        process.exit(errors ? 1 : 0);
+    }
+    case 'settings': {
+        const patch: Partial<Settings> = {};
+        if (values['my-team'] !== undefined) {
+            if (values['my-team'] && !db.query('SELECT 1 FROM teams WHERE slug = ?').get(values['my-team']))
+                throw new Error(`Unknown GitHub team "${values['my-team']}". Known: ${db.query<{ slug: string }, []>('SELECT slug FROM teams ORDER BY slug').all().map(t => t.slug).join(', ')}`);
+            patch.myTeam = values['my-team'] || null;
+        }
+        if (values['my-project-team'] !== undefined) patch.myProjectTeam = values['my-project-team'] || null;
+        const settings = Object.keys(patch).length ? updateSettings(db, patch) : getSettings();
+        console.log(JSON.stringify(settings, null, 2));
+        break;
+    }
     default:
         console.error(`Unknown command: ${command}\n\n${USAGE}`);
         process.exit(1);

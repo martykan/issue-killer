@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { UpdateParams } from './App.tsx';
 import { NO_VALUE } from './ProjectFilters.tsx';
-import { rememberedTeam } from './TeamSwitcher.tsx';
+import type { Meta } from './types.ts';
 import { useFetch } from './util.tsx';
 
 type TeamSummary = {
@@ -60,10 +60,10 @@ function stagesOf(t: TeamSummary, statuses: string[]) {
 
 const share = (n: number, of: number) => (of ? Math.round((100 * n) / of) : 0);
 
-export function TeamsDashboard({ params, update, reloadKey }: { params: URLSearchParams; update: UpdateParams; reloadKey: number }) {
+export function TeamsDashboard({ meta, params, update, reloadKey }: { meta: Meta | null; params: URLSearchParams; update: UpdateParams; reloadKey: number }) {
     const { data, error, loading } = useFetch<Overview>('/api/teams', reloadKey);
     const [numbers, setNumbers] = useState(false);
-    const myTeam = rememberedTeam();
+    const myTeam = meta?.settings.myProjectTeam ?? null;
 
     const go = (filters: Filter[]) =>
         update(

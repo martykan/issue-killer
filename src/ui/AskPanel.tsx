@@ -3,7 +3,7 @@ import type { Question } from './types.ts';
 import { Markdown, runJob, timeAgo } from './util.tsx';
 
 const SUGGESTIONS = [
-    'Is this still relevant for the current Connect architecture?',
+    'Is this still relevant given the current code?',
     'What would a minimal fix look like?',
     'Which part of the codebase is most likely involved?',
     'Summarize the discussion and open questions.',

@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { loadSettings } from './settings.ts';
 
 export const DEFAULT_DB_PATH = 'data/issues.db';
 
@@ -98,6 +99,12 @@ CREATE TABLE IF NOT EXISTS team_members (
     PRIMARY KEY (team_slug, login)
 );
 
+-- User preferences (see src/settings.ts); values are JSON.
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sync_state (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -110,7 +117,7 @@ CREATE TABLE IF NOT EXISTS issue_analysis (
     kind              TEXT NOT NULL,
     area              TEXT,
     owner_team        TEXT NOT NULL,
-    connect_relevance TEXT NOT NULL,
+    team_relevance    TEXT NOT NULL,              -- relevance to the user's team (settings.myTeam)
     recommendation    TEXT NOT NULL,
     confidence        TEXT NOT NULL,
     severity          TEXT NOT NULL,
@@ -173,6 +180,57 @@ CREATE TABLE IF NOT EXISTS issue_questions (
 );
 CREATE INDEX IF NOT EXISTS issue_questions_issue_idx ON issue_questions(issue_number, id);
 
+-- Open pull requests (full refresh on every sync; merged/closed ones are dropped). List-ish fields are JSON.
+CREATE TABLE IF NOT EXISTS pull_requests (
+    number          INTEGER PRIMARY KEY,
+    title           TEXT NOT NULL,
+    url             TEXT NOT NULL,
+    author          TEXT,
+    is_draft        INTEGER NOT NULL,
+    review_decision TEXT,                         -- APPROVED | CHANGES_REQUESTED | REVIEW_REQUIRED | null
+    ci_state        TEXT,                         -- SUCCESS | FAILURE | PENDING | ERROR | EXPECTED | null
+    mergeable       TEXT,                         -- MERGEABLE | CONFLICTING | UNKNOWN
+    additions       INTEGER NOT NULL DEFAULT 0,
+    deletions       INTEGER NOT NULL DEFAULT 0,
+    comments_count  INTEGER NOT NULL DEFAULT 0,
+    labels          TEXT NOT NULL DEFAULT '[]',   -- ["label", …]
+    assignees       TEXT NOT NULL DEFAULT '[]',   -- ["login", …]
+    review_requests TEXT NOT NULL DEFAULT '[]',   -- ["login" | "team:slug", …]
+    reviews         TEXT NOT NULL DEFAULT '[]',   -- [{ author, state, submittedAt }] latest per reviewer
+    closing_issues  TEXT NOT NULL DEFAULT '[]',   -- [issue number, …] (same repo)
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+
+-- Claude-written executive summaries of a team's board (history kept; the UI shows the latest).
+CREATE TABLE IF NOT EXISTS board_summaries (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_slug    TEXT NOT NULL,
+    result_json  TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    cost_usd     REAL,
+    duration_ms  INTEGER,
+    generated_at TEXT NOT NULL
+);
+
+-- Draft release plan (Plan view): pending edits not yet applied to GitHub. NULL = unchanged, '' = cleared.
+CREATE TABLE IF NOT EXISTS plan_changes (
+    issue_number INTEGER PRIMARY KEY REFERENCES issues(number) ON DELETE CASCADE,
+    release      TEXT,                            -- iteration title of the Release field
+    assignee     TEXT,                            -- login that should own the issue
+    changed_at   TEXT NOT NULL
+);
+
+-- Claude's release-plan suggestions per project team (latest shown).
+CREATE TABLE IF NOT EXISTS plan_suggestions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    team         TEXT NOT NULL,
+    result_json  TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    cost_usd     REAL,
+    generated_at TEXT NOT NULL
+);
+
 -- GitHub Projects (v2) the team plans in (needs read:project).
 CREATE TABLE IF NOT EXISTS projects (
     number      INTEGER PRIMARY KEY,
@@ -208,8 +266,18 @@ export function openDb(path = DEFAULT_DB_PATH): Database {
     const db = new Database(path, { create: true, strict: true });
     db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA foreign_keys = ON;');
+    migrate(db);
     db.exec(SCHEMA);
+    loadSettings(db);
     return db;
+}
+
+/** In-place upgrades of DBs created by older versions. */
+function migrate(db: Database) {
+    const columns = (table: string) => db.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map(c => c.name);
+    if (columns('issue_analysis').includes('connect_relevance')) {
+        db.exec('ALTER TABLE issue_analysis RENAME COLUMN connect_relevance TO team_relevance');
+    }
 }
 
 export function getState(db: Database, key: string): string | undefined {

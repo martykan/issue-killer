@@ -15,7 +15,12 @@ export type Meta = {
     analysis: AnalysisStats;
     investigations: { total: number; proposedClose: number | null; cost: number | null };
     projects: ProjectStats[];
+    settings: Settings;
 };
+
+export type Settings = { myTeam: string | null; myProjectTeam: string | null; setupDone: boolean };
+
+export type HealthCheck = { id: string; label: string; status: 'ok' | 'warn' | 'error'; detail: string; fix?: string; needed: string };
 
 export type ProjectStats = {
     number: number;
@@ -59,7 +64,7 @@ export type AnalysisStats = {
     enums: {
         kind: string[];
         owner_team: string[];
-        connect_relevance: string[];
+        team_relevance: string[];
         recommendation: string[];
         confidence: string[];
         severity: string[];
@@ -76,7 +81,7 @@ export type AnalysisSummary = {
     recommendation: string;
     confidence: string;
     ownerTeam: string;
-    connectRelevance: string;
+    teamRelevance: string;
     severity: string;
 };
 
@@ -85,7 +90,7 @@ export type Analysis = {
     kind: string;
     area: string;
     owner_team: string;
-    connect_relevance: string;
+    team_relevance: string;
     recommendation: string;
     confidence: string;
     reasoning: string;

@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { promptPath } from '../paths.ts';
+import { getSettings } from '../settings.ts';
 
 
 export const ENUMS = {
@@ -21,7 +22,7 @@ export const ENUMS = {
         'devops',
         'unknown',
     ],
-    connect_relevance: ['high', 'medium', 'low', 'none'],
+    team_relevance: ['high', 'medium', 'low', 'none'],
     recommendation: [
         'prioritize',
         'keep',
@@ -55,7 +56,7 @@ export const RESULT_SCHEMA = {
         'kind',
         'area',
         'owner_team',
-        'connect_relevance',
+        'team_relevance',
         'recommendation',
         'confidence',
         'reasoning',
@@ -69,7 +70,7 @@ export const RESULT_SCHEMA = {
         kind: { type: 'string', enum: ENUMS.kind },
         area: str,
         owner_team: { type: 'string', enum: ENUMS.owner_team },
-        connect_relevance: { type: 'string', enum: ENUMS.connect_relevance },
+        team_relevance: { type: 'string', enum: ENUMS.team_relevance },
         recommendation: { type: 'string', enum: ENUMS.recommendation },
         confidence: { type: 'string', enum: ENUMS.confidence },
         reasoning: str,
@@ -88,6 +89,8 @@ function promptTemplate() {
 export function promptVersion(): string {
     return createHash('sha256')
         .update(promptTemplate())
+        // Relevance is judged for the user's team, so changing it makes analyses outdated.
+        .update(getSettings().myTeam ?? '')
         .update(JSON.stringify(RESULT_SCHEMA))
         .digest('hex')
         .slice(0, 10);
@@ -99,7 +102,9 @@ export function buildSystemPrompt(db: Database): string {
         .all()
         .map(l => `- ${l.name}${l.description ? ` – ${l.description}` : ''}`)
         .join('\n');
-    return promptTemplate().replace('{{LABELS}}', labels);
+    const team = getSettings().myTeam;
+    const myTeam = team ? `\`${team}\`` : 'not configured (answer `none`)';
+    return promptTemplate().replace('{{LABELS}}', labels).replaceAll('{{MY_TEAM}}', myTeam);
 }
 
 const BODY_LIMIT = 12_000;
