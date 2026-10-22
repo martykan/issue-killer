@@ -2,6 +2,7 @@ import type { Database } from 'bun:sqlite';
 import { getState, setState } from './db.ts';
 import type { GitHubClient, RateLimit } from './github.ts';
 import { syncProject } from './projects.ts';
+import { syncPullRequests } from './pulls.ts';
 
 const RATE_LIMIT = 'rateLimit { remaining resetAt cost }';
 
@@ -196,6 +197,12 @@ export async function syncRepo(db: Database, gh: GitHubClient, opts: SyncOptions
             // Not fatal: e.g. token without read:project.
             log(`  skipping project ${number}: ${(err as Error).message.slice(0, 160)}`);
         }
+    }
+
+    try {
+        await syncPullRequests(db, gh, opts.owner, opts.name, log);
+    } catch (err) {
+        log(`  skipping pull requests: ${(err as Error).message.slice(0, 160)}`);
     }
 
     const since = opts.full ? undefined : getState(db, CURSOR_KEY);

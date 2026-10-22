@@ -31,8 +31,9 @@ Monorepo with Trezor Suite (desktop/web wallet, `suite/`, `suite-common/`), Trez
 - `devops` – CI, builds, release pipeline, infra.
 - `unknown` – genuinely unclear.
 
-`connect_relevance` is about the Connect team specifically: `high` if the root cause or fix most likely lives in
-Connect-owned code, `medium` if Connect is involved but another team leads, `low` if only tangential, `none` otherwise.
+`team_relevance` is about the reader's own team, {{MY_TEAM}}: `high` if the root cause or fix most likely lives in
+code that team owns (see the list above), `medium` if the team is involved but another team leads, `low` if only
+tangential, `none` otherwise.
 
 ## Recommendation
 

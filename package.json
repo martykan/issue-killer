@@ -12,7 +12,9 @@
     "desktop": "hutch electrobun dev",
     "desktop:build": "hutch electrobun build --env=stable",
     "typecheck:desktop": "tsc --noEmit -p src/desktop",
-    "desktop:install": "hutch electrobun build --env=stable && bun scripts/install-desktop.ts"
+    "desktop:install": "hutch electrobun build --env=stable && bun scripts/install-desktop.ts",
+    "doctor": "bun src/cli.ts doctor",
+    "settings": "bun src/cli.ts settings"
   },
   "devDependencies": {
     "@types/bun": "latest",

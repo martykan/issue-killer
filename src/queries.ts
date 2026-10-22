@@ -116,7 +116,7 @@ const SORTS: Record<string, string> = {
 const ANALYSIS_FILTERS: Record<string, string> = {
     rec: 'recommendation',
     owner: 'owner_team',
-    rel: 'connect_relevance',
+    rel: 'team_relevance',
     kind: 'kind',
     severity: 'severity',
     confidence: 'confidence',
@@ -319,7 +319,7 @@ export function listIssues(db: Database, p: URLSearchParams) {
                     (SELECT json_group_array(label) FROM issue_labels WHERE issue_number = i.number) AS labels,
                     (SELECT json_group_array(login) FROM issue_assignees WHERE issue_number = i.number) AS assignees,
                     (SELECT json_object('summary', a.summary, 'recommendation', a.recommendation, 'confidence', a.confidence,
-                            'ownerTeam', a.owner_team, 'connectRelevance', a.connect_relevance, 'severity', a.severity)
+                            'ownerTeam', a.owner_team, 'teamRelevance', a.team_relevance, 'severity', a.severity)
                      FROM issue_analysis a WHERE a.issue_number = i.number) AS analysis,
                     (SELECT json_object('verdict', v.verdict, 'confidence', v.confidence, 'proposedAction', v.proposed_action)
                      FROM issue_investigations v WHERE v.issue_number = i.number) AS investigation,

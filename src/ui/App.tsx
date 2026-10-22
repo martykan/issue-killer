@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IssueDetailPane } from './IssueDetail.tsx';
 import { IssueListPane } from './IssueList.tsx';
+import { BoardView } from './Board.tsx';
+import { PlanView } from './PlanView.tsx';
 import { ConfirmHost } from './confirm.tsx';
+import { SettingsDialog } from './SettingsDialog.tsx';
+import { SetupWizard } from './SetupWizard.tsx';
 import { Sidebar } from './Sidebar.tsx';
 import { SyncButton } from './SyncButton.tsx';
 import { TeamSwitcher, useRememberedTeam } from './TeamSwitcher.tsx';
@@ -38,8 +42,15 @@ export function App() {
     const [reloadKey, setReloadKey] = useState(0);
     const onSynced = useCallback(() => setReloadKey(k => k + 1), []);
     const meta = useFetch<Meta>('/api/meta', reloadKey);
-    useRememberedTeam(params, update);
-    const view = params.get('view') === 'teams' ? 'teams' : 'issues';
+    useRememberedTeam(meta.data, params, update);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [wizardOpen, setWizardOpen] = useState(false);
+    // First start (or setup never finished): show the wizard once the server answered.
+    useEffect(() => {
+        if (meta.data && !meta.data.settings.setupDone) setWizardOpen(true);
+    }, [meta.data?.settings.setupDone]); // eslint-disable-line react-hooks/exhaustive-deps
+    const viewParam = params.get('view');
+    const view = viewParam === 'teams' || viewParam === 'board' || viewParam === 'plan' ? viewParam : 'issues';
 
     const listQuery = useMemo(() => {
         const p = new URLSearchParams(params);
@@ -83,12 +94,18 @@ export function App() {
     }, [list.data, selected, select, update]);
 
     return (
-        <div className={`app${view === 'teams' ? ' teams-view' : ''}`}>
+        <div className={`app${view !== 'issues' ? ' teams-view' : ''}`}>
             <header className="topbar">
                 <strong className="app-name">Issue Killer</strong>
                 <div className="segmented view-toggle">
                     <button className={view === 'issues' ? 'active' : ''} onClick={() => update(p => p.delete('view'), { push: true })}>
                         Issues
+                    </button>
+                    <button className={view === 'board' ? 'active' : ''} onClick={() => update(p => p.set('view', 'board'), { push: true })}>
+                        Board
+                    </button>
+                    <button className={view === 'plan' ? 'active' : ''} onClick={() => update(p => p.set('view', 'plan'), { push: true })}>
+                        Plan
                     </button>
                     <button className={view === 'teams' ? 'active' : ''} onClick={() => update(p => p.set('view', 'teams'), { push: true })}>
                         Teams
@@ -96,14 +113,21 @@ export function App() {
                 </div>
                 <span className="grow" />
                 <TeamSwitcher meta={meta.data} params={params} update={update} />
+                <button className="small-button settings-button" onClick={() => setSettingsOpen(true)} title="Settings & setup check">
+                    ⚙
+                </button>
                 <SyncButton
                     onSynced={onSynced}
                     lastSyncAt={meta.data?.lastSyncAt ?? null}
                     summary={meta.data ? `${meta.data.repo} · ${meta.data.totals.open} open / ${meta.data.totals.closed} closed` : ''}
                 />
             </header>
-            {view === 'teams' ? (
-                <TeamsDashboard params={params} update={update} reloadKey={reloadKey} />
+            {view === 'plan' ? (
+                <PlanView meta={meta.data} params={params} update={update} reloadKey={reloadKey} />
+            ) : view === 'board' ? (
+                <BoardView meta={meta.data} params={params} update={update} reloadKey={reloadKey} />
+            ) : view === 'teams' ? (
+                <TeamsDashboard meta={meta.data} params={params} update={update} reloadKey={reloadKey} />
             ) : (
                 <>
             <Sidebar meta={meta.data} params={params} update={update} labelCounts={list.data?.labelCounts ?? []} />
@@ -120,6 +144,18 @@ export function App() {
                 </>
             )}
             <ConfirmHost />
+            {settingsOpen && meta.data && (
+                <SettingsDialog
+                    meta={meta.data}
+                    onClose={() => setSettingsOpen(false)}
+                    onSaved={onSynced}
+                    onOpenWizard={() => {
+                        setSettingsOpen(false);
+                        setWizardOpen(true);
+                    }}
+                />
+            )}
+            {wizardOpen && <SetupWizard meta={meta.data} onDataChanged={onSynced} onClose={() => setWizardOpen(false)} />}
         </div>
     );
 }

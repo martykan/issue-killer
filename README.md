@@ -10,6 +10,26 @@ from a local copy of GitHub data, with Claude doing the reading.
   severity, next step.
 - **Investigate** with a sandboxed Claude agent that checks code, git history and PRs whether an issue is already
   resolved, obsolete or a duplicate, and drafts a closing comment you can post with one click.
+- **Board** – each team member's assigned issues and open PRs as To do → In progress → In review, with a Claude
+  executive summary and next steps per person.
+- **Plan** – issues by person × release (the project's Release iteration field), drag & drop into a local draft,
+  Claude plan suggestions, then apply to GitHub.
+
+Nothing is tied to one team: on first start a setup wizard checks your tools, runs the first sync and asks which
+team you're on; that (and other preferences) is stored in the local DB and can be changed under ⚙ Settings.
+
+## Download (macOS app)
+
+CI builds the desktop app on every push and pull request (`.github/workflows/desktop.yml`):
+
+- **Latest build:** repo → *Actions* → *Desktop app* → newest run → *Artifacts* → `IssueKiller-macos-arm64-…`
+- **Releases:** pushing a tag `v*` (e.g. `git tag v0.2.0 && git push --tags`) attaches the zip to a GitHub Release.
+
+The app is for Apple silicon and is not signed/notarized, so macOS quarantines it after download:
+
+1. Unzip and move `Issue Killer.app` to `/Applications` (the first launch unpacks it in place).
+2. `xattr -dr com.apple.quarantine "/Applications/Issue Killer.app"` – or right-click → *Open* once.
+3. Open it; the setup wizard checks for `gh` / `claude` and walks you through the first sync.
 
 ## Requirements
 
@@ -23,9 +43,19 @@ from a local copy of GitHub data, with Claude doing the reading.
 
 ```sh
 bun install
-bun run sync --project 58     # first run ~15 min; later runs only fetch changes
-bun run ui                    # http://localhost:3000
+bun run doctor                # checks gh / claude / git, logins and scopes; prints fix commands
+bun run ui                    # http://localhost:3000 – the setup wizard does the first sync and team choice
 ```
+
+Or from the command line:
+
+```sh
+bun run sync --project 58     # first run ~15 min; later runs only fetch changes (58 = the Suite org project)
+bun run settings --my-team suite-wallet --my-project-team "Suite-Wallet 👛"
+```
+
+No credentials are stored or hardcoded: GitHub access comes from `GITHUB_TOKEN`/`GH_TOKEN` or the `gh` CLI login,
+Claude access from the `claude` CLI login.
 
 ## Sync
 
@@ -43,8 +73,8 @@ Options: `--repo owner/name`, `--db path`, `--page-size n` (lower it if GitHub r
 
 GitHub Projects: `bun run sync --project 58` also syncs the org project's items and custom fields (Team, Status,
 Priority, Release, Platform); the project list is remembered for later syncs. Needs `gh auth refresh -s read:project`.
-Project fields are the source of truth for team ownership (e.g. `Team = Connect devs 🔌`), and are available as UI
-filters (`pf=Team=Connect devs 🔌`) and in the Claude prompts.
+Project fields are the source of truth for team ownership (e.g. `Team = Suite-Wallet 👛`), and are available as UI
+filters (`pf=Team=Suite-Wallet 👛`) and in the Claude prompts.
 
 ## Browse
 
@@ -52,7 +82,7 @@ filters (`pf=Team=Connect devs 🔌`) and in the Claude prompts.
 bun run ui              # http://localhost:3000 (PORT=xxxx to change)
 ```
 
-Filter by state, text (optionally incl. comments), labels (with live counts; "Connect" selects all `connect*` labels),
+Filter by state, text (optionally incl. comments), labels (with live counts; a shortcut selects labels named after your team, e.g. `wallet*`),
 type, assignee, and triage signals. Filters live in the URL, so views can be bookmarked/shared.
 Keys: `/` search, `j`/`k` move, `Esc` close. The **Sync** button in the top bar runs an incremental sync in the
 server process and reloads the view when it finishes.
@@ -90,19 +120,20 @@ window), later launches start directly. Electrobun also keeps an uninstaller and
 `~/Library/Application Support/com.satoshilabs.issue-killer/`.
 
 - Data lives in `~/Library/Application Support/Issue Killer` (`issues.db`, and `trezor-suite/` for Investigate).
-  Point it elsewhere with `ISSUE_KILLER_DATA`, or share the CLI's data by symlinking that folder to `data/`.
+  Point it elsewhere with `ISSUE_KILLER_DATA`, or share the CLI's data by symlinking that folder to the repo's
+  `data/` folder (`ln -s "$PWD/data" ~/Library/Application\ Support/Issue\ Killer`, with the app quit).
 - The app uses your login shell's `PATH`, so `gh`, `git` and `claude` work as in the terminal.
 - `scripts/prepare-desktop.ts` (pre-build hook) bundles the UI, the investigation MCP server and the prompts into the app.
 
 ## Analyze with Claude
 
 Each issue (body, comments, linked PRs, labels, people) is sent to a headless `claude -p` call with a JSON
-schema and no tools. The result (summary, recommendation, owner team, Connect relevance, severity, effort,
+schema and no tools. The result (summary, recommendation, owner team, relevance to your team, severity, effort,
 reasoning, next step, suggested labels) is stored in `issue_analysis`.
 
 ```sh
 bun run analyze --dry-run                                  # how many open issues need analysis
-bun run analyze --filter "team=suite-connect" --budget 5   # UI-style filter, stop after $5
+bun run analyze --filter "team=suite-wallet" --budget 5   # UI-style filter, stop after $5
 bun run analyze --issue 33570 --force                      # (re-)analyze specific issues
 ```
 
@@ -124,7 +155,7 @@ evidence and a drafted closing comment. **It never writes anything**; closing is
 git clone --filter=blob:none --single-branch --branch develop https://github.com/trezor/trezor-suite.git data/trezor-suite
 
 bun run investigate --dry-run            # default: open issues triage wants to close or with a merged closing PR
-bun run investigate --filter "team=suite-connect&rec=close_obsolete" --budget 5
+bun run investigate --filter "team=suite-wallet&rec=close_obsolete" --budget 5
 bun run investigate --issue 8061
 
 bun run close-proposed                   # dry run: what the agent proposes to close (high confidence only)
@@ -152,6 +183,28 @@ Answers are stored in `issue_questions`; prompts are `prompts/ask.md` and `promp
 Analyze, Investigate and Ask run as server-side background jobs that the UI polls (`/api/jobs/:id`), so long agent
 runs don't hit request timeouts.
 
+## Board, summaries & planning
+
+**Board** (top bar → Board): rows are members of a GitHub team (default: your team from Settings), columns
+To do / In progress / In review. Assigned issues are placed by project Status; open PRs by draft state, with review
+state, CI, conflicts and age. An issue closed by one of the person's open PRs is shown on the PR card. Each row lists
+the reviews requested from that person. **✨ Summarize** writes an executive summary with risks and next steps for
+the team and each person (`prompts/board-summary.md`, `SUMMARY_MODEL`).
+
+**Plan** (top bar → Plan): a project team's open issues by person × release (the project's `Release` iteration
+field; past releases with open issues show as *Overdue*). Column headers show issue count, effort points (from
+Claude triage: S=1, M=3, L=8) and HIGH count. Drag cards to change release or assignee – changes are a local draft
+(`plan_changes`) until **Apply to GitHub**, which needs `gh auth refresh -s project`. **✨ Suggest plan** asks Claude
+for moves (`prompts/plan-suggest.md`, `PLAN_MODEL`) that you accept one by one or all at once.
+
+## Settings & setup check
+
+- `bun run doctor` / ⚙ Settings → *Setup check*: Bun, git, `gh` login and scopes (`repo`, `read:org`,
+  `read:project`; `project` for applying plans), `claude` login, synced data, code checkout, your team.
+- Preferences (`myTeam` GitHub team, `myProjectTeam` project Team value) live in the `settings` table:
+  `bun run settings`, or ⚙ Settings in the UI. "Relevance to my team" in Claude triage uses `myTeam`.
+- The setup wizard opens on first start (and from Settings): tools → first sync → team → optional code checkout.
+
 ## Project layout
 
 ```
@@ -164,6 +217,10 @@ src/
   analysis/           Claude triage: prompt building, runner
   investigate.ts      agentic investigation; mcp/investigate-tools.ts = its read-only tools
   ask.ts              free-form questions about an issue (thread-only or with code access)
+  board.ts, board-summary.ts       Board view + Claude executive summary
+  planning.ts, plan-actions.ts     Plan view, draft changes, apply to GitHub, Claude suggestions
+  pulls.ts            open pull request sync
+  settings.ts, doctor.ts           preferences, setup check
   actions.ts          closing issues on GitHub (+ audit log)
   claude.ts           headless `claude -p` wrapper (restricted mode, JSON schema)
   ui/                 React UI
@@ -190,13 +247,17 @@ scripts/              desktop pre-build + install
 | `issue_investigations` | latest agent investigation: verdict, evidence, proposed action, draft comment, session id |
 | `issue_actions`    | audit log of issues closed from this tool                                        |
 | `issue_questions`  | Ask Claude questions and answers per issue                                       |
+| `pull_requests`    | open PRs (review state, CI, linked issues) for the Board                         |
+| `board_summaries`, `plan_suggestions` | Claude summaries / plan suggestions (latest shown)            |
+| `plan_changes`     | draft release/assignee changes not yet applied to GitHub                         |
+| `settings`         | preferences (your team, setup done)                                              |
 
 Example:
 
 ```sh
 sqlite3 data/issues.db "
   SELECT i.number, i.title, r.source_number AS pr
-  FROM issues i JOIN issue_labels l ON l.issue_number = i.number AND l.label = 'connect'
+  FROM issues i JOIN issue_labels l ON l.issue_number = i.number AND l.label = 'send'
   JOIN issue_references r ON r.issue_number = i.number
   WHERE i.state = 'OPEN' AND r.source_state = 'MERGED'"
 ```

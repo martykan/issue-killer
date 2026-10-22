@@ -111,10 +111,10 @@ export function AnalysisPanel({ number, initial, labels, currentLabels, onFilter
                         {a.owner_team}
                     </button>
                 </dd>
-                <dt>Connect</dt>
+                <dt title="Relevance to your team (Settings)">My team</dt>
                 <dd>
-                    <button className="link" onClick={() => onFilter('rel', a.connect_relevance)}>
-                        {a.connect_relevance}
+                    <button className="link" onClick={() => onFilter('rel', a.team_relevance)}>
+                        {a.team_relevance ?? '—'}
                     </button>
                 </dd>
                 <dt>Kind / area</dt>
@@ -150,7 +150,7 @@ export function AnalysisPanel({ number, initial, labels, currentLabels, onFilter
 
 const FILTER_SELECTS: { key: AnalysisFilterKey; enumKey: keyof Meta['analysis']['enums']; title: string }[] = [
     { key: 'owner', enumKey: 'owner_team', title: 'Owner team' },
-    { key: 'rel', enumKey: 'connect_relevance', title: 'Connect relevance' },
+    { key: 'rel', enumKey: 'team_relevance', title: 'My team relevance' },
     { key: 'kind', enumKey: 'kind', title: 'Kind' },
     { key: 'severity', enumKey: 'severity', title: 'Severity' },
     { key: 'confidence', enumKey: 'confidence', title: 'Confidence' },

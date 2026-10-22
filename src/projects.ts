@@ -20,8 +20,14 @@ query($org: String!, $number: Int!, $after: String) {
             id title url
             fields(first: 50) {
                 nodes {
-                    ... on ProjectV2FieldCommon { name dataType }
-                    ... on ProjectV2SingleSelectField { options { name } }
+                    ... on ProjectV2FieldCommon { id name dataType }
+                    ... on ProjectV2SingleSelectField { options { id name } }
+                    ... on ProjectV2IterationField {
+                        configuration {
+                            iterations { id title startDate duration }
+                            completedIterations { id title startDate duration }
+                        }
+                    }
                 }
             }
             items(first: 100, after: $after) {
@@ -52,6 +58,25 @@ type FieldValueNode = {
     field?: { name?: string };
 };
 
+type Iteration = { id: string; title: string; startDate: string; duration: number };
+type FieldNode = {
+    id?: string;
+    name?: string;
+    dataType?: string;
+    options?: { id: string; name: string }[];
+    configuration?: { iterations: Iteration[]; completedIterations: Iteration[] };
+};
+
+/** Stored in projects.fields_json. Option/iteration ids are needed to write field values back (Plan view). */
+export type ProjectField = {
+    id: string;
+    name: string;
+    type: string;
+    options: string[] | null;
+    optionIds?: Record<string, string>;
+    iterations?: (Iteration & { completed: boolean })[];
+};
+
 type ItemNode = {
     id: string;
     isArchived: boolean;
@@ -65,7 +90,7 @@ type ProjectData = {
             id: string;
             title: string;
             url: string;
-            fields: { nodes: { name?: string; dataType?: string; options?: { name: string }[] }[] };
+            fields: { nodes: FieldNode[] };
             items: { totalCount: number; pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: ItemNode[] };
         } | null;
     };
@@ -106,7 +131,25 @@ export async function syncProject(db: Database, gh: GitHubClient, org: string, n
             project.id,
             project.title,
             project.url,
-            JSON.stringify(fields.map(f => ({ name: f.name, type: f.dataType, options: f.options?.map(o => o.name) ?? null }))),
+            JSON.stringify(
+                fields.map(
+                    (f): ProjectField => ({
+                        id: f.id!,
+                        name: f.name!,
+                        type: f.dataType!,
+                        options: f.options?.map(o => o.name) ?? null,
+                        ...(f.options ? { optionIds: Object.fromEntries(f.options.map(o => [o.name, o.id])) } : {}),
+                        ...(f.configuration
+                            ? {
+                                  iterations: [
+                                      ...f.configuration.completedIterations.map(i => ({ ...i, completed: true })),
+                                      ...f.configuration.iterations.map(i => ({ ...i, completed: false })),
+                                  ].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+                              }
+                            : {}),
+                    }),
+                ),
+            ),
             new Date().toISOString(),
         );
         db.query('DELETE FROM project_items WHERE project_number = ?').run(number);

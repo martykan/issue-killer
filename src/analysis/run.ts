@@ -40,7 +40,7 @@ function saveAnalysis(
 ) {
     db.query(
         `INSERT OR REPLACE INTO issue_analysis (
-            issue_number, summary, kind, area, owner_team, connect_relevance, recommendation, confidence,
+            issue_number, summary, kind, area, owner_team, team_relevance, recommendation, confidence,
             severity, effort, result_json, model, prompt_version, issue_updated_at, cost_usd, duration_ms, analyzed_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
@@ -49,7 +49,7 @@ function saveAnalysis(
         r.kind,
         r.area,
         r.owner_team,
-        r.connect_relevance,
+        r.team_relevance,
         r.recommendation,
         r.confidence,
         r.severity,
@@ -65,7 +65,7 @@ function saveAnalysis(
 }
 
 export type BatchOptions = {
-    /** Same query-string filters as the UI, e.g. "team=suite-connect&signal=stale". */
+    /** Same query-string filters as the UI, e.g. "team=suite-wallet&signal=stale". */
     filter: string;
     issues: number[];
     limit?: number;
@@ -119,7 +119,7 @@ export async function analyzeBatch(db: Database, opts: BatchOptions) {
                 const r = o.result;
                 log(
                     `[${done + failed}/${numbers.length}] #${number} → ${r.recommendation} (${r.confidence}) · ` +
-                        `${r.owner_team} · connect:${r.connect_relevance} · $${o.costUsd.toFixed(3)} · ${(o.durationMs / 1000).toFixed(0)}s`,
+                        `${r.owner_team} · relevance:${r.team_relevance} · $${o.costUsd.toFixed(3)} · ${(o.durationMs / 1000).toFixed(0)}s`,
                 );
             } catch (err) {
                 failed++;
