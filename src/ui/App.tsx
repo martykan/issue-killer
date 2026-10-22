@@ -140,7 +140,7 @@ export function App() {
                 onSelect={select}
                 onAnalyzed={onSynced}
             />
-            {selected && <IssueDetailPane number={selected} meta={meta.data} update={update} reloadKey={reloadKey} onClose={() => select(null)} onChanged={onSynced} />}
+            {selected && <IssueDetailPane number={selected} meta={meta.data} update={update} reloadKey={reloadKey} onClose={() => select(null)} onChanged={onSynced} onOpenSettings={() => setSettingsOpen(true)} />}
                 </>
             )}
             <ConfirmHost />

@@ -18,7 +18,7 @@ export type Meta = {
     settings: Settings;
 };
 
-export type Settings = { myTeam: string | null; myProjectTeam: string | null; setupDone: boolean };
+export type Settings = { myTeam: string | null; myProjectTeam: string | null; setupDone: boolean; conductorRepoPath: string | null };
 
 export type HealthCheck = { id: string; label: string; status: 'ok' | 'warn' | 'error'; detail: string; fix?: string; needed: string };
 
