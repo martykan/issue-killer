@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Investigation, IssueAction } from './types.ts';
 import { confirmDialog } from './confirm.tsx';
-import { timeAgo } from './util.tsx';
+import { runJob, timeAgo } from './util.tsx';
 
 const VERDICT_LABELS: Record<string, string> = {
     resolved: 'Resolved',
@@ -44,7 +44,12 @@ export function InvestigationPanel({ number, isOpen, initial, actions, onOpenIss
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // The detail pane may have moved to another issue by the time a job finishes.
+    const shownIssue = useRef(number);
+    shownIssue.current = number;
+
     useEffect(() => {
+        setRunning(false);
         setInv(initial);
         setError(null);
     }, [initial, number]);
@@ -53,10 +58,8 @@ export function InvestigationPanel({ number, isOpen, initial, actions, onOpenIss
         setRunning(true);
         setError(null);
         try {
-            const res = await fetch(`/api/issues/${number}/investigate`, { method: 'POST' });
-            const body = await res.json();
-            if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-            setInv(body as Investigation);
+            const result = await runJob<Investigation>(`/api/issues/${number}/investigate`);
+            if (shownIssue.current === number) setInv(result);
         } catch (err) {
             setError(String((err as Error).message ?? err));
         } finally {
@@ -71,7 +74,7 @@ export function InvestigationPanel({ number, isOpen, initial, actions, onOpenIss
     );
 
     return (
-        <div className={`investigation${running ? ' dim' : ''}`}>
+        <div className={`investigation${running ? ' dim' : ''}${!inv && !actions.length ? ' empty-panel' : ''}`}>
             {actions.map((a, i) => (
                 <div key={i} className="action-log">
                     ✅ Closed as {a.stateReason?.toLowerCase().replace('_', ' ')}

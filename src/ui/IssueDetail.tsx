@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef } from 'react';
 import { AnalysisPanel } from './Analysis.tsx';
+import { AskPanel } from './AskPanel.tsx';
 import { InvestigationPanel } from './Investigation.tsx';
 import type { UpdateParams } from './App.tsx';
 import type { IssueDetail, Meta, PersonStatus } from './types.ts';
@@ -80,6 +81,7 @@ export function IssueDetailPane({ number, meta, update, onClose, reloadKey, onCh
                         onOpenIssue={openIssue}
                         onClosed={() => onChanged?.()}
                     />
+                    <AskPanel number={issue.number} initial={issue.questions} />
 
                     <dl className="facts">
                         <dt>Type</dt>

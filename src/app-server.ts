@@ -4,6 +4,7 @@ import { getState, openDb } from './db.ts';
 import { GitHubClient, resolveToken } from './github.ts';
 import { analyzeBatch, analyzeIssue, selectIssues } from './analysis/run.ts';
 import { type CloseRequest, closeIssue } from './actions.ts';
+import { type AskMode, askQuestion, DEFAULT_ASK_MODEL, listQuestions } from './ask.ts';
 import { DEFAULT_INVESTIGATE_MODEL, investigateIssue, updateRepo } from './investigate.ts';
 import { getAnalysis, getInvestigation, getIssue, getMeta, listIssues, prepareTempTables } from './queries.ts';
 import { type SyncResult, syncRepo } from './sync.ts';
@@ -111,6 +112,27 @@ export function startServer(opts: ServerOptions) {
         }
     }
 
+    // Claude calls take from seconds to minutes – longer than webviews/proxies keep a request open – so they run as
+    // background jobs: POST returns a job id right away and the UI polls GET /api/jobs/:id.
+    type Job = { id: string; key: string; status: 'running' | 'done' | 'error'; result?: unknown; error?: string; startedAt: string };
+    const jobs = new Map<string, Job>();
+    const startJob = (key: string, run: () => Promise<unknown>): Response => {
+        // Re-clicking while the same job runs attaches to it instead of starting another Claude call.
+        const existing = [...jobs.values()].find(j => j.key === key && j.status === 'running');
+        if (existing) return Response.json({ jobId: existing.id }, { status: 202 });
+        const job: Job = { id: crypto.randomUUID(), key, status: 'running', startedAt: new Date().toISOString() };
+        jobs.set(job.id, job);
+        run()
+            .then(result => Object.assign(job, { status: 'done', result }))
+            .catch(err => {
+                console.error(`Job ${key} failed:`, err);
+                Object.assign(job, { status: 'error', error: (err as Error).message ?? String(err) });
+            })
+            // Finished jobs are kept a while for the poller, then dropped.
+            .finally(() => setTimeout(() => jobs.delete(job.id), 10 * 60_000));
+        return Response.json({ jobId: job.id }, { status: 202 });
+    };
+
     const server = Bun.serve({
         port: opts.port,
         hostname: opts.hostname ?? '127.0.0.1',
@@ -147,25 +169,33 @@ export function startServer(opts: ServerOptions) {
                     return Response.json(analyzeStatus, { status: 202 });
                 },
             },
+            '/api/jobs/:id': req => {
+                const job = jobs.get(req.params.id);
+                return job ? Response.json(job) : Response.json({ error: 'Job not found (server restarted?)' }, { status: 404 });
+            },
             '/api/issues/:number/analyze': {
-                POST: async req => {
+                POST: req => {
                     const number = Number(req.params.number);
-                    prepareTempTables(db);
-                    await analyzeIssue(db, number, { model: process.env.ANALYZE_MODEL ?? 'sonnet' });
-                    return Response.json(getAnalysis(db, number));
+                    return startJob(`analyze:${number}`, async () => {
+                        prepareTempTables(db);
+                        await analyzeIssue(db, number, { model: process.env.ANALYZE_MODEL ?? 'sonnet' });
+                        return getAnalysis(db, number);
+                    });
                 },
             },
             '/api/issues/:number/investigate': {
-                POST: async req => {
+                POST: req => {
                     const number = Number(req.params.number);
-                    const repoSha = await updateRepo(opts.repoPath);
-                    await investigateIssue(db, number, {
-                        model: process.env.INVESTIGATE_MODEL ?? DEFAULT_INVESTIGATE_MODEL,
-                        repoPath: opts.repoPath,
-                        dbPath: opts.dbPath,
-                        repoSha,
+                    return startJob(`investigate:${number}`, async () => {
+                        const repoSha = await updateRepo(opts.repoPath);
+                        await investigateIssue(db, number, {
+                            model: process.env.INVESTIGATE_MODEL ?? DEFAULT_INVESTIGATE_MODEL,
+                            repoPath: opts.repoPath,
+                            dbPath: opts.dbPath,
+                            repoSha,
+                        });
+                        return getInvestigation(db, number);
                     });
-                    return Response.json(getInvestigation(db, number));
                 },
             },
             // Writes to GitHub: only ever triggered by an explicit click in the UI.
@@ -187,8 +217,28 @@ export function startServer(opts: ServerOptions) {
             },
             '/api/issues': req => Response.json(listIssues(db, new URL(req.url).searchParams)),
             '/api/issues/:number': req => {
-                const issue = getIssue(db, Number(req.params.number));
-                return issue ? Response.json(issue) : Response.json({ error: 'Not found' }, { status: 404 });
+                const number = Number(req.params.number);
+                const issue = getIssue(db, number);
+                return issue
+                    ? Response.json({ ...issue, questions: listQuestions(db, number) })
+                    : Response.json({ error: 'Not found' }, { status: 404 });
+            },
+            '/api/issues/:number/ask': {
+                POST: async req => {
+                    const number = Number(req.params.number);
+                    const { question, mode = 'thread' } = (await req.json()) as { question: string; mode?: AskMode };
+                    return startJob(`ask:${number}:${crypto.randomUUID()}`, async () => {
+                        const repoSha = mode === 'code' ? await updateRepo(opts.repoPath) : undefined;
+                        return askQuestion(db, number, {
+                            question,
+                            mode,
+                            model: process.env.ASK_MODEL ?? DEFAULT_ASK_MODEL,
+                            repoPath: opts.repoPath,
+                            dbPath: opts.dbPath,
+                            repoSha,
+                        });
+                    });
+                },
             },
         },
         // Pre-built UI assets (desktop app); the HTML import serves its own assets.

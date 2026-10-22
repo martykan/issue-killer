@@ -158,6 +158,21 @@ CREATE TABLE IF NOT EXISTS issue_actions (
     performed_at TEXT NOT NULL
 );
 
+-- Free-form questions asked about an issue ("Ask Claude"), with answers. Earlier Q&A feeds follow-ups.
+CREATE TABLE IF NOT EXISTS issue_questions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_number INTEGER NOT NULL REFERENCES issues(number) ON DELETE CASCADE,
+    question     TEXT NOT NULL,
+    answer       TEXT NOT NULL,
+    mode         TEXT NOT NULL,                   -- thread | code
+    model        TEXT NOT NULL,
+    session_id   TEXT,                            -- code mode: claude --resume <id> (in the checkout)
+    cost_usd     REAL,
+    duration_ms  INTEGER,
+    asked_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS issue_questions_issue_idx ON issue_questions(issue_number, id);
+
 -- GitHub Projects (v2) the team plans in (needs read:project).
 CREATE TABLE IF NOT EXISTS projects (
     number      INTEGER PRIMARY KEY,

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { UpdateParams } from './App.tsx';
 import type { Analysis, AnalysisFilterKey, AnalyzeStatus, Meta } from './types.ts';
 import { confirmDialog } from './confirm.tsx';
-import { LabelChip, timeAgo } from './util.tsx';
+import { LabelChip, runJob, timeAgo } from './util.tsx';
 
 export const REC_LABELS: Record<string, string> = {
     prioritize: 'Prioritize',
@@ -41,8 +41,12 @@ export function AnalysisPanel({ number, initial, labels, currentLabels, onFilter
     const [analysis, setAnalysis] = useState(initial);
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // The detail pane may have moved to another issue by the time a job finishes.
+    const shownIssue = useRef(number);
+    shownIssue.current = number;
 
     useEffect(() => {
+        setRunning(false);
         setAnalysis(initial);
         setError(null);
     }, [initial, number]);
@@ -51,10 +55,8 @@ export function AnalysisPanel({ number, initial, labels, currentLabels, onFilter
         setRunning(true);
         setError(null);
         try {
-            const res = await fetch(`/api/issues/${number}/analyze`, { method: 'POST' });
-            const body = await res.json();
-            if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-            setAnalysis(body as Analysis);
+            const result = await runJob<Analysis>(`/api/issues/${number}/analyze`);
+            if (shownIssue.current === number) setAnalysis(result);
         } catch (err) {
             setError(String((err as Error).message ?? err));
         } finally {
@@ -70,10 +72,13 @@ export function AnalysisPanel({ number, initial, labels, currentLabels, onFilter
 
     if (!analysis) {
         return (
-            <div className="analysis empty-analysis">
-                <span className="muted">Not analyzed yet.</span>
-                {button}
-                {error && <span className="error">{error}</span>}
+            <div className="analysis empty-panel">
+                <div className="analysis-head">
+                    <span className="muted">Not analyzed yet.</span>
+                    <span className="grow" />
+                    {button}
+                </div>
+                {error && <div className="error">{error}</div>}
             </div>
         );
     }
