@@ -1,0 +1,4 @@
+{
+  "extends": ["../../tsconfig.json", "../../.hutch/devkit/tsconfig.json"],
+  "include": ["./**/*.ts", "../../electrobun.config.ts"]
+}
