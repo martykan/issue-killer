@@ -10,6 +10,7 @@ import { getAnalysis, getInvestigation, getIssue, getMeta, listIssues, prepareTe
 import { type SyncResult, syncRepo } from './sync.ts';
 import { getTeamsOverview } from './teams.ts';
 import { runChecks } from './doctor.ts';
+import { buildHandoffPrompt, conductorUrl, openInConductor } from './handoff.ts';
 import { getSettings, type Settings, updateSettings } from './settings.ts';
 import { getBoard } from './board.ts';
 import { getLatestSummary, summarizeBoard } from './board-summary.ts';
@@ -319,6 +320,17 @@ export function startServer(opts: ServerOptions) {
                 return issue
                     ? Response.json({ ...issue, questions: listQuestions(db, number) })
                     : Response.json({ error: 'Not found' }, { status: 404 });
+            },
+            '/api/issues/:number/handoff': {
+                GET: req => {
+                    const prompt = buildHandoffPrompt(db, Number(req.params.number));
+                    return Response.json({ prompt, url: conductorUrl(prompt), repoPath: getSettings().conductorRepoPath });
+                },
+                POST: async req => {
+                    const { prompt } = (await req.json()) as { prompt: string };
+                    if (!prompt?.trim()) return Response.json({ error: 'Empty prompt' }, { status: 400 });
+                    return Response.json({ url: openInConductor(prompt) });
+                },
             },
             '/api/issues/:number/ask': {
                 POST: async req => {

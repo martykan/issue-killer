@@ -6,6 +6,7 @@ import type { HealthCheck, Meta } from './types.ts';
 export function SettingsDialog({ meta, onClose, onSaved, onOpenWizard }: { meta: Meta; onClose: () => void; onSaved: () => void; onOpenWizard: () => void }) {
     const [myTeam, setMyTeam] = useState(meta.settings.myTeam ?? '');
     const [myProjectTeam, setMyProjectTeam] = useState(meta.settings.myProjectTeam ?? '');
+    const [conductorRepoPath, setConductorRepoPath] = useState(meta.settings.conductorRepoPath ?? '');
     const [checks, setChecks] = useState<HealthCheck[] | null>(null);
     const [checking, setChecking] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -26,7 +27,7 @@ export function SettingsDialog({ meta, onClose, onSaved, onOpenWizard }: { meta:
     const save = async () => {
         setSaving(true);
         try {
-            await saveSettings({ myTeam: myTeam || null, myProjectTeam: myProjectTeam || null });
+            await saveSettings({ myTeam: myTeam || null, myProjectTeam: myProjectTeam || null, conductorRepoPath: conductorRepoPath.trim() || null });
             onSaved();
             onClose();
         } finally {
@@ -68,6 +69,17 @@ export function SettingsDialog({ meta, onClose, onSaved, onOpenWizard }: { meta:
                 {myTeam !== (meta.settings.myTeam ?? '') && meta.analysis.analyzedOpen > 0 && (
                     <p className="muted small">Changing the GitHub team marks existing Claude analyses as outdated (relevance is judged for your team).</p>
                 )}
+
+                <h3>Conductor handoff</h3>
+                <label className="field-select">
+                    <span className="field-label">Root path of the trezor-suite repository as added in Conductor (Settings → Repositories there)</span>
+                    <input
+                        className="search"
+                        value={conductorRepoPath}
+                        onChange={e => setConductorRepoPath(e.target.value)}
+                        placeholder="e.g. /Users/you/code/trezor-suite – empty = Conductor's first repository"
+                    />
+                </label>
 
                 <h3>
                     Setup check

@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { HandoffDialog } from './HandoffDialog.tsx';
 import { AnalysisPanel } from './Analysis.tsx';
 import { AskPanel } from './AskPanel.tsx';
 import { InvestigationPanel } from './Investigation.tsx';
@@ -14,9 +15,11 @@ type Props = {
     onClose: () => void;
     /** Called after the issue was changed on GitHub (e.g. closed) so lists can refresh. */
     onChanged?: () => void;
+    onOpenSettings?: () => void;
 };
 
-export function IssueDetailPane({ number, meta, update, onClose, reloadKey, onChanged }: Props) {
+export function IssueDetailPane({ number, meta, update, onClose, reloadKey, onChanged, onOpenSettings }: Props) {
+    const [handoff, setHandoff] = useState(false);
     const { data: issue, loading, error } = useFetch<IssueDetail>(`/api/issues/${number}`, reloadKey);
     const scrollRef = useRef<HTMLDivElement>(null);
     const signals = new Map(meta?.signals.map(s => [s.key, s]));
@@ -34,10 +37,25 @@ export function IssueDetailPane({ number, meta, update, onClose, reloadKey, onCh
 
     return (
         <section className="detail" ref={scrollRef}>
+            {handoff && (
+                <HandoffDialog
+                    number={number}
+                    onClose={() => setHandoff(false)}
+                    onOpenSettings={() => {
+                        setHandoff(false);
+                        onOpenSettings?.();
+                    }}
+                />
+            )}
             <div className="detail-toolbar">
                 <span className="muted">#{number}</span>
                 {loading && <span className="muted">loading…</span>}
                 <span className="grow" />
+                {issue && (
+                    <button className="small-button" onClick={() => setHandoff(true)} title="Start a Conductor workspace for this issue">
+                        → Conductor
+                    </button>
+                )}
                 {issue && (
                     <a href={issue.url} target="_blank" rel="noreferrer">
                         Open on GitHub ↗

@@ -11,9 +11,11 @@ export type Settings = {
     myProjectTeam: string | null;
     /** The first-start setup wizard was completed (or skipped). */
     setupDone: boolean;
+    /** Root path of the repo as added in Conductor; targets "Hand off to Conductor" deep links. */
+    conductorRepoPath: string | null;
 };
 
-const DEFAULTS: Settings = { myTeam: null, myProjectTeam: null, setupDone: false };
+const DEFAULTS: Settings = { myTeam: null, myProjectTeam: null, setupDone: false, conductorRepoPath: null };
 const KEYS = Object.keys(DEFAULTS) as (keyof Settings)[];
 
 // Loaded once per process (openDb) and on every update, so code without a DB handle can read it.

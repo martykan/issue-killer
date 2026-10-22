@@ -195,6 +195,13 @@ Claude triage: S=1, M=3, L=8) and HIGH count. Drag cards to change release or as
 (`plan_changes`) until **Apply to GitHub**, which needs `gh auth refresh -s project`. **✨ Suggest plan** asks Claude
 for moves (`prompts/plan-suggest.md`, `PLAN_MODEL`) that you accept one by one or all at once.
 
+## Hand off to Conductor
+
+The issue detail has a **→ Conductor** button: it builds a prompt with the issue link, labels, project fields,
+linked PRs and everything Claude found (triage, investigation, Q&A), lets you edit it, and opens it as a new
+[Conductor](https://conductor.build) workspace via its deep link (`conductor://prompt=…&path=…`). Set the repository
+root as added in Conductor under ⚙ Settings → *Conductor handoff* (or `bun run settings --conductor-repo-path …`).
+
 ## Settings & setup check
 
 - `bun run doctor` / ⚙ Settings → *Setup check*: Bun, git, `gh` login and scopes (`repo`, `read:org`,
@@ -248,7 +255,7 @@ scripts/              desktop pre-build + install
 | `pull_requests`    | open PRs (review state, CI, linked issues) for the Board                         |
 | `board_summaries`, `plan_suggestions` | Claude summaries / plan suggestions (latest shown)            |
 | `plan_changes`     | draft release/assignee changes not yet applied to GitHub                         |
-| `settings`         | preferences (your team, setup done)                                              |
+| `settings`         | preferences (your team, setup done, Conductor repo path)                         |
 
 Example:
 

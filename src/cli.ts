@@ -19,6 +19,7 @@ Commands:
   status    Show what's in the local DB
   doctor    Check that gh / claude / git are installed and authenticated, and data is synced
   settings  Show or change preferences: --my-team <github-team-slug> --my-project-team "<project Team value>"
+            --conductor-repo-path <path>  (repo root as added in Conductor, for "Hand off to Conductor")
 
 Options:
   --repo <owner/name>   Repository (default: trezor/trezor-suite)
@@ -71,6 +72,7 @@ const { values, positionals } = parseArgs({
         execute: { type: 'boolean', default: false },
         'my-team': { type: 'string' },
         'my-project-team': { type: 'string' },
+        'conductor-repo-path': { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
     },
 });
@@ -185,6 +187,7 @@ switch (command) {
             patch.myTeam = values['my-team'] || null;
         }
         if (values['my-project-team'] !== undefined) patch.myProjectTeam = values['my-project-team'] || null;
+        if (values['conductor-repo-path'] !== undefined) patch.conductorRepoPath = values['conductor-repo-path'] || null;
         const settings = Object.keys(patch).length ? updateSettings(db, patch) : getSettings();
         console.log(JSON.stringify(settings, null, 2));
         break;
