@@ -231,6 +231,31 @@ CREATE TABLE IF NOT EXISTS plan_suggestions (
     generated_at TEXT NOT NULL
 );
 
+-- Claude-generated topic maps (Topics view). One map per scope; regenerating replaces the latest.
+CREATE TABLE IF NOT EXISTS topic_maps (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope        TEXT NOT NULL,                   -- "all" | "team:<project Team value>"
+    issue_count  INTEGER NOT NULL,
+    model        TEXT NOT NULL,
+    cost_usd     REAL,
+    generated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS topics (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    map_id      INTEGER NOT NULL REFERENCES topic_maps(id) ON DELETE CASCADE,
+    parent_id   INTEGER REFERENCES topics(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL,
+    position    INTEGER NOT NULL,
+    duplicate_groups TEXT NOT NULL DEFAULT '[]' -- [[issue, issue, …], …] (subtopics only)
+);
+CREATE TABLE IF NOT EXISTS topic_issues (
+    topic_id     INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    issue_number INTEGER NOT NULL,
+    PRIMARY KEY (topic_id, issue_number)
+);
+CREATE INDEX IF NOT EXISTS topic_issues_issue_idx ON topic_issues(issue_number);
+
 -- GitHub Projects (v2) the team plans in (needs read:project).
 CREATE TABLE IF NOT EXISTS projects (
     number      INTEGER PRIMARY KEY,

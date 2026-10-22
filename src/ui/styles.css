@@ -2002,3 +2002,233 @@ kbd {
     padding: 2px 10px;
 }
 
+/* Topics view (mind map) */
+:root {
+    /* Categorical slots 1–8 of the validated palette, fixed order. */
+    --cat-1: #2a78d6;
+    --cat-2: #eb6834;
+    --cat-3: #1baf7a;
+    --cat-4: #eda100;
+    --cat-5: #e87ba4;
+    --cat-6: #008300;
+    --cat-7: #4a3aa7;
+    --cat-8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --cat-1: #3987e5;
+        --cat-2: #d95926;
+        --cat-3: #199e70;
+        --cat-4: #c98500;
+        --cat-5: #d55181;
+        --cat-6: #008300;
+        --cat-7: #9085e9;
+        --cat-8: #e66767;
+    }
+}
+.topics-view {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 20px 24px 0;
+}
+.topics-head {
+    flex: 0 0 auto;
+}
+.topics-empty {
+    padding: 40px 0;
+    text-align: center;
+}
+.topics-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 16px;
+    min-height: 0;
+    flex: 1;
+}
+.topics-canvas {
+    overflow: auto;
+    min-height: 0;
+    padding-bottom: 24px;
+}
+.mindmap-fit {
+    margin: 0 auto;
+}
+.mindmap {
+    position: relative;
+    transform-origin: top left;
+}
+.mindmap-links {
+    position: absolute;
+    inset: 0;
+}
+.mm-node {
+    position: absolute;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    text-align: left;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    transition: opacity 0.15s;
+}
+.mm-node.dimmed {
+    opacity: 0.35;
+}
+.mm-root {
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--bg-subtle);
+    border: 1.5px solid var(--text);
+    font-weight: 600;
+}
+.mm-topic {
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 40px;
+    background: color-mix(in srgb, var(--topic) 16%, var(--bg));
+    border: 1.5px solid var(--topic);
+}
+.mm-sub {
+    min-height: 32px;
+    border-left: 3px solid var(--topic);
+}
+.mm-node:hover,
+.mm-node.active {
+    box-shadow: 0 0 0 2px var(--topic, var(--accent));
+}
+.mm-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mm-count {
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    font-weight: 600;
+}
+.mm-stats {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+}
+.mm-flags {
+    flex-basis: 100%;
+    display: flex;
+    gap: 4px;
+}
+.flag {
+    font-size: 10px;
+    padding: 0 5px;
+    border-radius: 6px;
+    line-height: 15px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    white-space: nowrap;
+}
+.flag-high {
+    color: var(--danger);
+    border-color: currentColor;
+}
+.flag-close {
+    color: var(--accent);
+    border-color: currentColor;
+}
+.flag-dup {
+    color: #9a6700;
+    border-color: currentColor;
+}
+.topics-panel {
+    overflow: auto;
+    min-height: 0;
+    border-left: 1px solid var(--border);
+    padding: 4px 0 24px 16px;
+}
+.topics-hint p {
+    line-height: 1.6;
+}
+.topic-panel h3 {
+    margin: 2px 0 4px;
+    font-size: 16px;
+    border-left: 4px solid var(--topic);
+    padding-left: 8px;
+}
+.topic-panel h4 {
+    margin: 14px 0 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+}
+.topic-panel-actions {
+    align-items: center;
+}
+.dup-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    border: 1px dashed #9a6700;
+}
+.topic-issues {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.topic-issues li {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+}
+.issue-line {
+    text-align: left;
+    color: var(--text);
+    font-size: 13px;
+}
+.topic-issue-flags {
+    margin-left: auto;
+    display: flex;
+    gap: 3px;
+}
+.outline {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-width: 760px;
+}
+.outline ul {
+    list-style: none;
+    padding-left: 22px;
+    margin: 2px 0 10px;
+}
+.outline button {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    background: none;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 6px;
+    text-align: left;
+}
+.outline button.active,
+.outline button:hover {
+    background: var(--bg-hover);
+}
+.outline-topic {
+    font-weight: 600;
+    font-size: 14px;
+}
