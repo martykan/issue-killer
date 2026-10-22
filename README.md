@@ -195,6 +195,15 @@ Claude triage: S=1, M=3, L=8) and HIGH count. Drag cards to change release or as
 (`plan_changes`) until **Apply to GitHub**, which needs `gh auth refresh -s project`. **✨ Suggest plan** asks Claude
 for moves (`prompts/plan-suggest.md`, `PLAN_MODEL`) that you accept one by one or all at once.
 
+## Topics (mind map)
+
+Top bar → **Topics**: Claude groups the open issues of a scope (your project team, any team, or all open issues)
+into ~6–10 topics with subtopics, assigns every issue to one subtopic and flags likely duplicate groups
+(`prompts/topics.md`, `TOPICS_MODEL`; one call, ~$0.15 for 170 issues). The mind map shows counts, HIGH-priority and
+close-candidate badges per node; selecting a node lists its issues and duplicates, and *Open in Issues* filters the
+issue list to that topic (`topic=<id>`). Maps are stored per scope (`topic_maps`, `topics`, `topic_issues`) and can be
+regenerated; an Outline mode shows the same hierarchy as a list.
+
 ## Hand off to Conductor
 
 The issue detail has a **→ Conductor** button: it builds a prompt with the issue link, labels, project fields,
@@ -256,6 +265,7 @@ scripts/              desktop pre-build + install
 | `board_summaries`, `plan_suggestions` | Claude summaries / plan suggestions (latest shown)            |
 | `plan_changes`     | draft release/assignee changes not yet applied to GitHub                         |
 | `settings`         | preferences (your team, setup done, Conductor repo path)                         |
+| `topic_maps`, `topics`, `topic_issues` | Claude topic maps per scope (Topics view)                    |
 
 Example:
 

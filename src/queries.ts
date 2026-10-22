@@ -281,6 +281,12 @@ export function buildFilter(p: URLSearchParams, { skipLabels = false } = {}): Fi
             OR EXISTS (SELECT 1 FROM issue_investigations v WHERE v.issue_number = i.number AND v.proposed_action LIKE 'close_%'))`);
     }
 
+    // Topic from the Topics view (topic or subtopic id).
+    for (const topic of p.getAll('topic')) {
+        where.push('EXISTS (SELECT 1 FROM topic_issues ti WHERE ti.issue_number = i.number AND ti.topic_id = ?)');
+        args.push(Number(topic));
+    }
+
     const inv = p.get('inv');
     if (inv === 'none') where.push('NOT EXISTS (SELECT 1 FROM issue_investigations v WHERE v.issue_number = i.number)');
     else if (inv === 'done') where.push('EXISTS (SELECT 1 FROM issue_investigations v WHERE v.issue_number = i.number)');

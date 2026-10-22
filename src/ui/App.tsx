@@ -3,6 +3,7 @@ import { IssueDetailPane } from './IssueDetail.tsx';
 import { IssueListPane } from './IssueList.tsx';
 import { BoardView } from './Board.tsx';
 import { PlanView } from './PlanView.tsx';
+import { TopicsView } from './TopicsView.tsx';
 import { ConfirmHost } from './confirm.tsx';
 import { SettingsDialog } from './SettingsDialog.tsx';
 import { SetupWizard } from './SetupWizard.tsx';
@@ -50,7 +51,7 @@ export function App() {
         if (meta.data && !meta.data.settings.setupDone) setWizardOpen(true);
     }, [meta.data?.settings.setupDone]); // eslint-disable-line react-hooks/exhaustive-deps
     const viewParam = params.get('view');
-    const view = viewParam === 'teams' || viewParam === 'board' || viewParam === 'plan' ? viewParam : 'issues';
+    const view = viewParam === 'teams' || viewParam === 'board' || viewParam === 'plan' || viewParam === 'topics' ? viewParam : 'issues';
 
     const listQuery = useMemo(() => {
         const p = new URLSearchParams(params);
@@ -107,6 +108,9 @@ export function App() {
                     <button className={view === 'plan' ? 'active' : ''} onClick={() => update(p => p.set('view', 'plan'), { push: true })}>
                         Plan
                     </button>
+                    <button className={view === 'topics' ? 'active' : ''} onClick={() => update(p => p.set('view', 'topics'), { push: true })}>
+                        Topics
+                    </button>
                     <button className={view === 'teams' ? 'active' : ''} onClick={() => update(p => p.set('view', 'teams'), { push: true })}>
                         Teams
                     </button>
@@ -122,7 +126,9 @@ export function App() {
                     summary={meta.data ? `${meta.data.repo} · ${meta.data.totals.open} open / ${meta.data.totals.closed} closed` : ''}
                 />
             </header>
-            {view === 'plan' ? (
+            {view === 'topics' ? (
+                <TopicsView meta={meta.data} params={params} update={update} reloadKey={reloadKey} />
+            ) : view === 'plan' ? (
                 <PlanView meta={meta.data} params={params} update={update} reloadKey={reloadKey} />
             ) : view === 'board' ? (
                 <BoardView meta={meta.data} params={params} update={update} reloadKey={reloadKey} />

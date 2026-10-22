@@ -9,6 +9,7 @@ import { DEFAULT_INVESTIGATE_MODEL, investigateIssue, updateRepo } from './inves
 import { getAnalysis, getInvestigation, getIssue, getMeta, listIssues, prepareTempTables } from './queries.ts';
 import { type SyncResult, syncRepo } from './sync.ts';
 import { getTeamsOverview } from './teams.ts';
+import { generateTopicMap, getTopicMap } from './topics.ts';
 import { runChecks } from './doctor.ts';
 import { buildHandoffPrompt, conductorUrl, openInConductor } from './handoff.ts';
 import { getSettings, type Settings, updateSettings } from './settings.ts';
@@ -37,6 +38,12 @@ export function startServer(opts: ServerOptions) {
     prepareTempTables(db);
     const staticDir = 'staticDir' in opts.ui ? resolve(opts.ui.staticDir) : null;
     const DEFAULT_REPO = 'trezor/trezor-suite';
+    const topicScope = (params: URLSearchParams) => {
+        const scope = params.get('scope');
+        if (scope) return scope;
+        const team = getSettings().myProjectTeam;
+        return team ? `team:${team}` : 'all';
+    };
     // Board default: the user's team from Settings, else the first team that has members.
     const defaultBoardTeam = () =>
         getSettings().myTeam ??
@@ -312,6 +319,26 @@ export function startServer(opts: ServerOptions) {
                     const team = params.get('team') ?? '';
                     return startJob(`plan-apply:${team}`, async () => applyPlan(db, new GitHubClient(await resolveToken()), project, team));
                 },
+            },
+            // Topics view: ?scope=all | team:<project Team value> (default: your project team)
+            '/api/topics': req => {
+                const scope = topicScope(new URL(req.url).searchParams);
+                return Response.json({ scope, map: getTopicMap(db, scope) });
+            },
+            '/api/topics/generate': {
+                POST: req => {
+                    const scope = topicScope(new URL(req.url).searchParams);
+                    return startJob(`topics:${scope}`, async () => {
+                        await generateTopicMap(db, scope, process.env.TOPICS_MODEL);
+                        return getTopicMap(db, scope);
+                    });
+                },
+            },
+            '/api/topics/:id': req => {
+                const t = db.query<{ name: string; parent: string | null }, [number]>(
+                    'SELECT t.name, p.name AS parent FROM topics t LEFT JOIN topics p ON p.id = t.parent_id WHERE t.id = ?',
+                ).get(Number(req.params.id));
+                return t ? Response.json(t) : Response.json({ error: 'Topic not found' }, { status: 404 });
             },
             '/api/issues': req => Response.json(listIssues(db, new URL(req.url).searchParams)),
             '/api/issues/:number': req => {

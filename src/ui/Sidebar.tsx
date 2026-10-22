@@ -3,6 +3,7 @@ import { AnalysisFilters, REC_LABELS } from './Analysis.tsx';
 import type { UpdateParams } from './App.tsx';
 import { NO_VALUE, ProjectFilters } from './ProjectFilters.tsx';
 import type { Meta } from './types.ts';
+import { useFetch } from './util.tsx';
 
 type Props = {
     meta: Meta | null;
@@ -21,7 +22,7 @@ const SIGNAL_GROUPS: { title: string; keys: string[] }[] = [
 ];
 
 // Params that aren't filters (view state) – never shown as chips.
-const NON_FILTER_PARAMS = new Set(['state', 'sort', 'page', 'issue', 'view', 'tview', 'bteam', 'pteam', 'team_role']);
+const NON_FILTER_PARAMS = new Set(['state', 'sort', 'page', 'issue', 'view', 'tview', 'bteam', 'pteam', 'scope', 'team_role']);
 
 export function Sidebar({ meta, params, update, labelCounts }: Props) {
     const urlQuery = params.get('q') ?? '';
@@ -161,7 +162,7 @@ function ActiveFilters({ meta, params, update }: { meta: Meta | null; params: UR
         <div className="active-filters">
             {chips.map(c => (
                 <span key={`${c.key}=${c.value}`} className="filter-chip" title={c.label}>
-                    <span className="filter-chip-label">{c.label}</span>
+                    <span className="filter-chip-label">{c.key === 'topic' ? <TopicName id={c.value} /> : c.label}</span>
                     <button onClick={() => remove(c.key, c.value)} aria-label={`Remove ${c.label}`}>
                         ×
                     </button>
@@ -174,6 +175,12 @@ function ActiveFilters({ meta, params, update }: { meta: Meta | null; params: UR
             )}
         </div>
     );
+}
+
+/** Topic filter chips show the topic's name (fetched once). */
+function TopicName({ id }: { id: string }) {
+    const { data } = useFetch<{ name: string; parent: string | null }>(`/api/topics/${id}`);
+    return <>topic: {data ? (data.parent ? `${data.parent} › ${data.name}` : data.name) : `#${id}`}</>;
 }
 
 function describeFilters(params: URLSearchParams, meta: Meta | null): { key: string; value: string; label: string }[] {
