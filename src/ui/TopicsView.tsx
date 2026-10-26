@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { UpdateParams } from './App.tsx';
+import { layout, linkPath, ROOT_W, SUB_W, slotVar, TOPIC_W } from '../topics-layout.ts';
 import { confirmDialog } from './confirm.tsx';
 import type { Meta } from './types.ts';
 import { runJob, timeAgo, useFetch } from './util.tsx';
@@ -18,54 +19,6 @@ type TopicNode = {
     children: TopicNode[];
 };
 type TopicMap = { scope: string; issueCount: number; model: string; costUsd: number | null; generatedAt: string; topics: TopicNode[] };
-
-// Mind-map geometry (px).
-const ROW = 48;
-const TOPIC_GAP = 22;
-const ROOT_W = 170;
-const TOPIC_W = 240;
-const SUB_W = 250;
-const X_TOPIC = 260; // root center → topic center
-const X_SUB = 580; // root center → subtopic center
-const MARGIN = 24;
-// Categorical slots 1–8 (validated palette, fixed order); topics beyond 8 fall back to neutral.
-const SLOTS = 8;
-
-type Placed = { node: TopicNode; x: number; y: number; side: -1 | 1; slot: number; parent?: Placed };
-
-function layout(topics: TopicNode[]) {
-    const rows = (t: TopicNode) => Math.max(1, t.children.length);
-    const sides: { items: TopicNode[]; rows: number }[] = [
-        { items: [], rows: 0 },
-        { items: [], rows: 0 },
-    ];
-    // Biggest topics first, each to the side with fewer rows → balanced map.
-    for (const t of topics) {
-        const side = sides[0]!.rows <= sides[1]!.rows ? sides[0]! : sides[1]!;
-        side.items.push(t);
-        side.rows += rows(t);
-    }
-    const sideHeight = (s: { items: TopicNode[]; rows: number }) => s.rows * ROW + Math.max(0, s.items.length - 1) * TOPIC_GAP;
-    const height = Math.max(sideHeight(sides[0]!), sideHeight(sides[1]!), ROW) + 2 * MARGIN;
-    const width = 2 * (X_SUB + SUB_W / 2) + 2 * MARGIN;
-    const cx = width / 2;
-    const placed: Placed[] = [];
-    sides.forEach((s, si) => {
-        const dir = si === 0 ? 1 : -1;
-        let y = (height - sideHeight(s)) / 2;
-        for (const t of s.items) {
-            const block = rows(t) * ROW;
-            const slot = topics.indexOf(t);
-            const topic: Placed = { node: t, x: cx + dir * X_TOPIC, y: y + block / 2, side: dir as 1 | -1, slot };
-            placed.push(topic);
-            t.children.forEach((c, j) => placed.push({ node: c, x: cx + dir * X_SUB, y: y + ROW * (j + 0.5), side: dir as 1 | -1, slot, parent: topic }));
-            y += block + TOPIC_GAP;
-        }
-    });
-    return { width, height, cx, cy: height / 2, placed };
-}
-
-const slotVar = (slot: number) => (slot < SLOTS ? `var(--cat-${slot + 1})` : 'var(--muted)');
 
 export function TopicsView({ meta, params, update, reloadKey }: { meta: Meta | null; params: URLSearchParams; update: UpdateParams; reloadKey: number }) {
     const scopeParam = params.get('scope');
@@ -162,6 +115,17 @@ export function TopicsView({ meta, params, update, reloadKey }: { meta: Meta | n
                         </button>
                     </div>
                 )}
+                {map && (
+                    <a
+                        className="small-button"
+                        href={`/api/topics/export?scope=${encodeURIComponent(scope)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Download the map and its issues as a single HTML file to share"
+                    >
+                        Export HTML
+                    </a>
+                )}
                 <button className="small-button" onClick={generate} disabled={generating}>
                     {generating ? (
                         <>
@@ -198,26 +162,18 @@ export function TopicsView({ meta, params, update, reloadKey }: { meta: Meta | n
                             <div className="mindmap-fit" style={{ width: geometry.width * scale, height: geometry.height * scale }}>
                             <div className="mindmap" style={{ width: geometry.width, height: geometry.height, transform: `scale(${scale})` }}>
                                 <svg width={geometry.width} height={geometry.height} className="mindmap-links" aria-hidden>
-                                    {geometry.placed.map(p => {
-                                        const from = p.parent ?? { x: geometry.cx, y: geometry.cy, side: p.side };
-                                        const fromW = p.parent ? TOPIC_W : ROOT_W;
-                                        const toW = p.parent ? SUB_W : TOPIC_W;
-                                        const x1 = from.x + (p.side * fromW) / 2;
-                                        const x2 = p.x - (p.side * toW) / 2;
-                                        const mid = (x1 + x2) / 2;
-                                        return (
-                                            <path
-                                                key={p.node.id}
-                                                d={`M${x1},${from.y} C${mid},${from.y} ${mid},${p.y} ${x2},${p.y}`}
-                                                stroke={slotVar(p.slot)}
-                                                strokeOpacity={selected && selected.slot !== p.slot ? 0.2 : 0.55}
-                                                strokeWidth={p.parent ? 1.5 : 2}
-                                                fill="none"
-                                            />
-                                        );
-                                    })}
+                                    {geometry.placed.map(p => (
+                                        <path
+                                            key={p.node.id}
+                                            d={linkPath(p, geometry)}
+                                            stroke={slotVar(p.slot)}
+                                            strokeOpacity={selected && selected.slot !== p.slot ? 0.2 : 0.55}
+                                            strokeWidth={p.parent ? 1.5 : 2}
+                                            fill="none"
+                                        />
+                                    ))}
                                 </svg>
-                                <div className="mm-node mm-root" style={{ left: geometry.cx - ROOT_W / 2, top: geometry.cy - 22, width: ROOT_W }}>
+                                <div className="mm-node mm-root" style={{ left: geometry.cx - ROOT_W / 2, top: geometry.cy, width: ROOT_W }}>
                                     <div className="mm-name">{scope === 'all' ? 'All open issues' : scope.slice(5)}</div>
                                     <div className="mm-stats">{map.topics.reduce((n, t) => n + t.count, 0)} issues</div>
                                 </div>
@@ -230,7 +186,7 @@ export function TopicsView({ meta, params, update, reloadKey }: { meta: Meta | n
                                         <button
                                             key={p.node.id}
                                             className={`mm-node ${isTopic ? 'mm-topic' : 'mm-sub'}${active ? ' active' : ''}${dimmed ? ' dimmed' : ''}`}
-                                            style={{ left: p.x - w / 2, top: p.y - (isTopic ? 20 : 16), width: w, ['--topic' as string]: slotVar(p.slot) }}
+                                            style={{ left: p.x - w / 2, top: p.y, width: w, ['--topic' as string]: slotVar(p.slot) }}
                                             onClick={() => setSelectedId(active ? null : p.node.id)}
                                             title={p.node.description}
                                         >

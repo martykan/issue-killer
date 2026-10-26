@@ -11,6 +11,7 @@ import { type SyncResult, syncRepo } from './sync.ts';
 import { listProjects } from './projects.ts';
 import { getTeamsOverview } from './teams.ts';
 import { generateTopicMap, getTopicMap } from './topics.ts';
+import { renderTopicsHtml, scopeLabel } from './topics-export.ts';
 import { runChecks } from './doctor.ts';
 import { buildHandoffPrompt, conductorUrl, openInConductor } from './handoff.ts';
 import { getSettings, type Settings, updateSettings } from './settings.ts';
@@ -335,6 +336,19 @@ export function startServer(opts: ServerOptions) {
             '/api/topics': req => {
                 const scope = topicScope(new URL(req.url).searchParams);
                 return Response.json({ scope, map: getTopicMap(db, scope) });
+            },
+            // Self-contained HTML of the scope's topic map, as a download.
+            '/api/topics/export': req => {
+                const scope = topicScope(new URL(req.url).searchParams);
+                const map = getTopicMap(db, scope);
+                if (!map) return Response.json({ error: 'No topic map for this scope' }, { status: 404 });
+                const slug = scopeLabel(scope).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                return new Response(renderTopicsHtml(map, getState(db, 'repo') ?? null), {
+                    headers: {
+                        'Content-Type': 'text/html; charset=utf-8',
+                        'Content-Disposition': `attachment; filename="topics-${slug || 'scope'}-${new Date().toISOString().slice(0, 10)}.html"`,
+                    },
+                });
             },
             '/api/topics/generate': {
                 POST: req => {

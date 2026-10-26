@@ -1759,6 +1759,10 @@ kbd {
     gap: 6px;
     padding: 4px 12px;
 }
+.board-head a.small-button {
+    color: inherit;
+    text-decoration: none;
+}
 
 /* Settings */
 .settings-modal {
@@ -2070,6 +2074,8 @@ kbd {
 }
 .mm-node {
     position: absolute;
+    /* Centered on the link's y; nodes with badges are taller. */
+    translate: 0 -50%;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
