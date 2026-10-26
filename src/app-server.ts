@@ -8,6 +8,7 @@ import { type AskMode, askQuestion, DEFAULT_ASK_MODEL, listQuestions } from './a
 import { DEFAULT_INVESTIGATE_MODEL, investigateIssue, updateRepo } from './investigate.ts';
 import { getAnalysis, getInvestigation, getIssue, getMeta, listIssues, prepareTempTables } from './queries.ts';
 import { type SyncResult, syncRepo } from './sync.ts';
+import { listProjects } from './projects.ts';
 import { getTeamsOverview } from './teams.ts';
 import { generateTopicMap, getTopicMap } from './topics.ts';
 import { runChecks } from './doctor.ts';
@@ -185,6 +186,16 @@ export function startServer(opts: ServerOptions) {
                     repoPath: opts.repoPath,
                     hasCheckout: existsSync(join(opts.repoPath, '.git')),
                 }),
+            // Setup wizard: open org projects to pick from, ?repo=owner/name.
+            '/api/setup/projects': async req => {
+                const [owner, name] = (new URL(req.url).searchParams.get('repo') ?? '').split('/');
+                if (!owner || !name) return Response.json({ error: 'repo must be owner/name' }, { status: 400 });
+                try {
+                    return Response.json(await listProjects(new GitHubClient(await resolveToken()), owner, name));
+                } catch (err) {
+                    return Response.json({ error: (err as Error).message }, { status: 502 });
+                }
+            },
             // Setup wizard: blob-less clone of the repo for Investigate / Ask with code (~800 MB).
             '/api/setup/checkout': {
                 POST: () =>
@@ -266,7 +277,7 @@ export function startServer(opts: ServerOptions) {
                 const project = Number(params.get('project')) || (db.query<{ n: number }, []>('SELECT MIN(number) AS n FROM projects').get()?.n ?? 0);
                 prepareTempTables(db);
                 const overview = getTeamsOverview(db, project);
-                return overview ? Response.json(overview) : Response.json({ error: 'No synced project. Run: bun run sync --project <n>' }, { status: 404 });
+                return overview ? Response.json(overview) : Response.json({ error: 'No synced project. Pick one in Settings → Run setup wizard (or: bun run sync --project <n>)' }, { status: 404 });
             },
             '/api/board': req => {
                 const team = new URL(req.url).searchParams.get('team') || defaultBoardTeam();
@@ -288,7 +299,7 @@ export function startServer(opts: ServerOptions) {
                 const params = new URL(req.url).searchParams;
                 const project = Number(params.get('project')) || defaultProject(db);
                 const plan = project ? getPlan(db, project, params.get('team') || getSettings().myProjectTeam || '') : null;
-                return plan ? Response.json(plan) : Response.json({ error: 'No synced project. Run: bun run sync --project <n>' }, { status: 404 });
+                return plan ? Response.json(plan) : Response.json({ error: 'No synced project. Pick one in Settings → Run setup wizard (or: bun run sync --project <n>)' }, { status: 404 });
             },
             '/api/plan/changes': {
                 POST: async req => {

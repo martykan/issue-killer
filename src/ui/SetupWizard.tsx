@@ -3,6 +3,7 @@ import { saveSettings } from './settings.ts';
 import type { HealthCheck, Meta, SyncStatus } from './types.ts';
 import { runJob } from './util.tsx';
 
+type ProjectChoice = { number: number; title: string };
 type SetupInfo = { repo: string | null; defaultRepo: string; projects: number[]; issues: number; repoPath: string; hasCheckout: boolean };
 
 const STEPS = ['Tools', 'Data', 'Your team', 'Code checkout'] as const;
@@ -119,9 +120,24 @@ export function CheckList({ checks }: { checks: HealthCheck[] }) {
 
 function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () => void; onNext: () => void }) {
     const [repo, setRepo] = useState(info.repo ?? info.defaultRepo);
-    const [project, setProject] = useState(info.projects.join(', '));
+    const [project, setProject] = useState(info.projects[0] ? String(info.projects[0]) : '');
+    const [choices, setChoices] = useState<ProjectChoice[]>([]);
+    const [choicesError, setChoicesError] = useState<string | null>(null);
     const [status, setStatus] = useState<SyncStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [continueAfterSync, setContinueAfterSync] = useState(false);
+
+    // Projects linked to the repo; preselect the biggest one unless the configured project is among them.
+    useEffect(() => {
+        if (!/^[^/\s]+\/[^/\s]+$/.test(repo.trim())) return;
+        const t = setTimeout(async () => {
+            const body = (await (await fetch(`/api/setup/projects?repo=${encodeURIComponent(repo.trim())}`)).json()) as ProjectChoice[] | { error: string };
+            setChoices(Array.isArray(body) ? body : []);
+            setChoicesError(Array.isArray(body) ? null : body.error);
+            if (Array.isArray(body) && body[0] && !body.some(p => info.projects.includes(p.number))) setProject(String(body[0].number));
+        }, 400);
+        return () => clearTimeout(t);
+    }, [repo, info.projects]);
 
     useEffect(() => {
         if (!status?.running) return;
@@ -130,19 +146,21 @@ function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () =>
             setStatus(next);
             if (!next.running) {
                 if (next.error) setError(next.error);
-                else onSynced();
+                else {
+                    onSynced();
+                    if (continueAfterSync) onNext();
+                }
             }
         }, 1500);
         return () => clearTimeout(t);
-    }, [status, onSynced]);
+    }, [status, onSynced, onNext, continueAfterSync]);
 
-    const start = async () => {
+    // The project is saved by syncing it; the team step needs its fields.
+    const projects = project ? [Number(project)] : [];
+    const projectChanged = projects.join() !== info.projects.join();
+    const start = async (thenContinue = false) => {
         setError(null);
-        const projects = project
-            .split(/[\s,]+/)
-            .filter(Boolean)
-            .map(Number)
-            .filter(n => Number.isInteger(n) && n > 0);
+        setContinueAfterSync(thenContinue);
         const res = await fetch('/api/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -164,10 +182,18 @@ function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () =>
                     <input className="search" value={repo} onChange={e => setRepo(e.target.value)} disabled={!!info.repo} />
                 </label>
                 <label className="field-select">
-                    <span className="field-label">GitHub Project number(s) of the org (e.g. 58 = Suite)</span>
-                    <input className="search" value={project} onChange={e => setProject(e.target.value)} placeholder="optional, e.g. 58" />
+                    <span className="field-label">GitHub Project (Team/Status/Priority fields)</span>
+                    <select value={project} onChange={e => setProject(e.target.value)}>
+                        <option value="">None</option>
+                        {choices.map(p => (
+                            <option key={p.number} value={p.number}>
+                                {p.title} (#{p.number})
+                            </option>
+                        ))}
+                    </select>
                 </label>
             </div>
+            {choicesError && <p className="muted small">Couldn't list the repo's projects: {choicesError}</p>}
             {synced && !status?.running && <p className="ok-line">✓ {info.issues.toLocaleString()} issues synced.</p>}
             {status?.running && (
                 <p className="muted">
@@ -176,11 +202,15 @@ function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () =>
             )}
             {error && <p className="error">Sync failed: {error}</p>}
             <div className="modal-actions">
-                <button className={synced ? 'small-button' : 'primary-button'} onClick={start} disabled={!!status?.running || !repo.includes('/')}>
+                <button className={synced ? 'small-button' : 'primary-button'} onClick={() => start()} disabled={!!status?.running || !repo.includes('/')}>
                     {synced ? 'Sync again' : 'Start first sync'}
                 </button>
-                <button className={synced ? 'primary-button' : 'small-button'} onClick={onNext} disabled={!!status?.running}>
-                    {synced ? 'Continue' : 'Continue without data'}
+                <button
+                    className={synced ? 'primary-button' : 'small-button'}
+                    onClick={synced && projectChanged ? () => start(true) : onNext}
+                    disabled={!!status?.running}
+                >
+                    {!synced ? 'Continue without data' : projectChanged ? 'Sync & continue' : 'Continue'}
                 </button>
             </div>
         </>
