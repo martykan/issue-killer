@@ -1270,6 +1270,12 @@ kbd {
     width: 100%;
     min-width: 0;
 }
+/* Native selects render taller than text inputs; keep side-by-side fields aligned. */
+.field-select select,
+.field-select .search {
+    box-sizing: border-box;
+    height: 26px;
+}
 .pills {
     display: flex;
     flex-wrap: wrap;

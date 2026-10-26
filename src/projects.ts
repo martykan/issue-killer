@@ -175,3 +175,23 @@ export async function syncProject(db: Database, gh: GitHubClient, org: string, n
     })();
     log(`  project ${project.title} (#${number}): ${items.length} items`);
 }
+
+export type ProjectChoice = { number: number; title: string };
+
+const PROJECT_LIST_QUERY = `
+query($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) { projectsV2(first: 50) { nodes { number title closed items { totalCount } } } }
+}`;
+
+type ProjectListData = {
+    repository: { projectsV2: { nodes: { number: number; title: string; closed: boolean; items: { totalCount: number } }[] } } | null;
+};
+
+/** Open projects linked to the repo for the setup wizard, biggest first. */
+export async function listProjects(gh: GitHubClient, owner: string, name: string): Promise<ProjectChoice[]> {
+    const data: ProjectListData = await gh.query(PROJECT_LIST_QUERY, { owner, name });
+    return (data.repository?.projectsV2.nodes ?? [])
+        .filter(p => !p.closed)
+        .sort((a, b) => b.items.totalCount - a.items.totalCount)
+        .map(p => ({ number: p.number, title: p.title }));
+}
