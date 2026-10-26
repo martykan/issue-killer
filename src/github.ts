@@ -3,7 +3,7 @@ const GRAPHQL_URL = 'https://api.github.com/graphql';
 export async function resolveToken(): Promise<string> {
     const fromEnv = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
     if (fromEnv) return fromEnv;
-    const proc = Bun.spawnSync(['gh', 'auth', 'token']);
+    const proc = Bun.spawnSync(['gh', 'auth', 'token'], { env: process.env });
     const token = proc.stdout.toString().trim();
     if (proc.exitCode !== 0 || !token) {
         throw new Error('No GitHub token. Set GITHUB_TOKEN or log in with `gh auth login`.');

@@ -77,6 +77,7 @@ export async function runClaude<T>(opts: ClaudeOptions): Promise<ClaudeRun<T>> {
 
     const proc = Bun.spawn(args, {
         cwd: opts.cwd ?? tmpdir(),
+        env: process.env,
         stdin: new TextEncoder().encode(opts.prompt),
         stdout: 'pipe',
         stderr: 'pipe',
