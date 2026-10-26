@@ -90,7 +90,7 @@ export async function updateRepo(repoPath: string): Promise<string> {
         );
     }
     const git = (...args: string[]) => {
-        const p = Bun.spawnSync(['git', '-C', repoPath, ...args]);
+        const p = Bun.spawnSync(['git', '-C', repoPath, ...args], { env: process.env });
         if (p.exitCode !== 0) throw new Error(`git ${args.join(' ')} failed: ${p.stderr.toString().trim()}`);
         return p.stdout.toString().trim();
     };

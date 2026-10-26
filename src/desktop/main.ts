@@ -6,10 +6,12 @@ import { join } from 'node:path';
 import { ApplicationMenu, BrowserWindow, PATHS, Utils } from 'electrobun/main';
 
 // GUI apps get a minimal PATH; we need `claude`, `gh` and `git` from the user's shell setup.
+// Bun resolves commands against the PATH it started with, so every spawn must pass `env: process.env` to use this one.
 function adoptLoginShellPath() {
     const shell = process.env.SHELL ?? '/bin/zsh';
-    const res = Bun.spawnSync([shell, '-ilc', 'printf "%s" "$PATH"'], { stdout: 'pipe', stderr: 'ignore' });
-    const path = res.stdout.toString().trim();
+    // Markers, because interactive rc files may print to stdout (e.g. iTerm2 shell integration escape codes).
+    const res = Bun.spawnSync([shell, '-ilc', 'printf "__PATH__%s__PATH__" "$PATH"'], { stdout: 'pipe', stderr: 'ignore' });
+    const path = res.stdout.toString().match(/__PATH__(.*)__PATH__/s)?.[1];
     if (res.exitCode === 0 && path) process.env.PATH = path;
 }
 adoptLoginShellPath();

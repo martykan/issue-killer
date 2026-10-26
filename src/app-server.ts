@@ -193,7 +193,7 @@ export function startServer(opts: ServerOptions) {
                         const repo = getState(db, 'repo') ?? opts.repo ?? DEFAULT_REPO;
                         const proc = Bun.spawn(
                             ['git', 'clone', '--filter=blob:none', '--single-branch', '--branch', 'develop', `https://github.com/${repo}.git`, opts.repoPath],
-                            { stdout: 'ignore', stderr: 'pipe' },
+                            { stdout: 'ignore', stderr: 'pipe', env: process.env },
                         );
                         const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
                         if (code !== 0) throw new Error(`git clone failed: ${stderr.trim().split('\n').at(-1)}`);

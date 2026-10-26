@@ -16,7 +16,7 @@ const REQUIRED_SCOPES = ['repo', 'read:org', 'read:project'];
 
 function run(cmd: string[]): { ok: boolean; out: string } {
     try {
-        const p = Bun.spawnSync(cmd, { stdout: 'pipe', stderr: 'pipe' });
+        const p = Bun.spawnSync(cmd, { stdout: 'pipe', stderr: 'pipe', env: process.env });
         return { ok: p.exitCode === 0, out: (p.stdout.toString() + p.stderr.toString()).trim() };
     } catch {
         return { ok: false, out: 'not found' };
