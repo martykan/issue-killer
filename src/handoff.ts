@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import { listQuestions } from './ask.ts';
 import { getAnalysis, getInvestigation } from './queries.ts';
-import { getSettings } from './settings.ts';
 
 // "Hand off to Conductor": a prompt with everything we know about an issue, opened as a new Conductor workspace
 // via its deep link (https://docs.conductor.build/core/deep-links): conductor://prompt=…&path=…
@@ -70,16 +69,16 @@ export function buildHandoffPrompt(db: Database, number: number): string {
     return clip(lines.join('\n'), MAX_PROMPT);
 }
 
-export function conductorUrl(prompt: string): string {
+/** `path`: repository root as added in Conductor; none = Conductor's first repository. */
+export function conductorUrl(prompt: string, path: string | null): string {
     const params = [`prompt=${encodeURIComponent(prompt)}`];
-    const path = getSettings().conductorRepoPath;
     if (path) params.push(`path=${encodeURIComponent(path)}`);
     return `conductor://${params.join('&')}`;
 }
 
 /** Opens the deep link in Conductor (macOS `open`). Only ever opens conductor:// URLs built here. */
-export function openInConductor(prompt: string) {
-    const url = conductorUrl(prompt);
+export function openInConductor(prompt: string, path: string | null) {
+    const url = conductorUrl(prompt, path);
     const proc = Bun.spawnSync(['open', url]);
     if (proc.exitCode !== 0) throw new Error(`Could not open Conductor: ${proc.stderr.toString().trim() || `exit ${proc.exitCode}`}`);
     return url;

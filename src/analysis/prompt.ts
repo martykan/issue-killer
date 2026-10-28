@@ -86,11 +86,11 @@ function promptTemplate() {
 }
 
 /** Changes whenever the prompt or output schema changes; analyses with another version are "outdated". */
-export function promptVersion(): string {
+export function promptVersion(db: Database): string {
     return createHash('sha256')
         .update(promptTemplate())
         // Relevance is judged for the user's team, so changing it makes analyses outdated.
-        .update(getSettings().myTeam ?? '')
+        .update(getSettings(db).myTeam ?? '')
         .update(JSON.stringify(RESULT_SCHEMA))
         .digest('hex')
         .slice(0, 10);
@@ -102,7 +102,7 @@ export function buildSystemPrompt(db: Database): string {
         .all()
         .map(l => `- ${l.name}${l.description ? ` – ${l.description}` : ''}`)
         .join('\n');
-    const team = getSettings().myTeam;
+    const team = getSettings(db).myTeam;
     const myTeam = team ? `\`${team}\`` : 'not configured (answer `none`)';
     return promptTemplate().replace('{{LABELS}}', labels).replaceAll('{{MY_TEAM}}', myTeam);
 }
@@ -193,9 +193,10 @@ export function buildIssuePrompt(db: Database, number: number): { prompt: string
 
     if (refs.length) {
         lines.push('', '## Linked pull requests / issues', '');
+        const ownRepo = db.query<{ value: string }, []>("SELECT value FROM sync_state WHERE key = 'repo'").get()?.value;
         for (const r of refs) {
             const kind = r.source_type === 'PullRequest' ? 'PR' : 'Issue';
-            const repo = r.source_repo === 'trezor/trezor-suite' ? '' : String(r.source_repo);
+            const repo = r.source_repo === ownRepo ? '' : String(r.source_repo);
             lines.push(
                 `- ${kind} ${repo}#${r.source_number} [${r.source_state}] ${r.source_title ?? ''}` +
                     (r.will_close ? ' — linked as closing this issue' : '') +

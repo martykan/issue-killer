@@ -39,7 +39,9 @@ export function SettingsDialog({ meta, onClose, onSaved, onOpenWizard }: { meta:
         <div className="modal-backdrop" onClick={onClose}>
             <div className="modal settings-modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
                 <h2>Settings</h2>
-                <p className="muted small">Stored in the local database – shared by the app, the browser UI and the CLI.</p>
+                <p className="muted small">
+                    Settings of {meta.repo ?? 'this repository'} – shared by the app, the browser UI and the CLI.
+                </p>
 
                 <h3>Your team</h3>
                 <div className="settings-grid">
@@ -72,12 +74,12 @@ export function SettingsDialog({ meta, onClose, onSaved, onOpenWizard }: { meta:
 
                 <h3>Conductor handoff</h3>
                 <label className="field-select">
-                    <span className="field-label">Root path of the trezor-suite repository as added in Conductor (Settings → Repositories there)</span>
+                    <span className="field-label">Root path of {meta.repo ?? 'the repository'} as added in Conductor (Settings → Repositories there)</span>
                     <input
                         className="search"
                         value={conductorRepoPath}
                         onChange={e => setConductorRepoPath(e.target.value)}
-                        placeholder="e.g. /Users/you/code/trezor-suite – empty = Conductor's first repository"
+                        placeholder="empty = the repository's local folder, else Conductor's first repository"
                     />
                 </label>
 

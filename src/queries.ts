@@ -163,7 +163,7 @@ export function prepareTempTables(db: Database) {
 
 type Filter = { where: string; args: (string | number)[] };
 
-export function buildFilter(p: URLSearchParams, { skipLabels = false } = {}): Filter {
+export function buildFilter(db: Database, p: URLSearchParams, { skipLabels = false } = {}): Filter {
     const where: string[] = [];
     const args: (string | number)[] = [];
 
@@ -249,7 +249,7 @@ export function buildFilter(p: URLSearchParams, { skipLabels = false } = {}): Fi
     else if (ai === 'done') where.push('EXISTS (SELECT 1 FROM issue_analysis a WHERE a.issue_number = i.number)');
     else if (ai === 'outdated') {
         where.push(`EXISTS (SELECT 1 FROM issue_analysis a WHERE a.issue_number = i.number AND (${OUTDATED_SQL}))`);
-        args.push(promptVersion());
+        args.push(promptVersion(db));
     }
     // Project fields: pf=Field=Value, repeatable. Values of the same field are OR'd, different fields AND'd.
     const projectFilters = new Map<string, string[]>();
@@ -312,7 +312,7 @@ function pickSignals(row: Record<string, unknown>): SignalKey[] {
 }
 
 export function listIssues(db: Database, p: URLSearchParams) {
-    const { where, args } = buildFilter(p);
+    const { where, args } = buildFilter(db, p);
     const sort = SORTS[p.get('sort') ?? 'updated'] ?? SORTS.updated;
     const page = Math.max(1, Number(p.get('page')) || 1);
 
@@ -338,7 +338,7 @@ export function listIssues(db: Database, p: URLSearchParams) {
         .all(...args);
 
     // Label facet counts ignore the label filter itself so you can see what else you could pick.
-    const facet = buildFilter(p, { skipLabels: true });
+    const facet = buildFilter(db, p, { skipLabels: true });
     const labelCounts = db
         .query<{ label: string; n: number }, typeof args>(
             `SELECT l.label, COUNT(*) n FROM issue_labels l JOIN issues i ON i.number = l.issue_number
@@ -494,7 +494,7 @@ export function getAnalysis(db: Database, number: number) {
             `SELECT a.*, (${OUTDATED_SQL}) AS outdated FROM issue_analysis a JOIN issues i ON i.number = a.issue_number
              WHERE a.issue_number = ?`,
         )
-        .get(promptVersion(), number);
+        .get(promptVersion(db), number);
     if (!a) return null;
     return {
         ...JSON.parse(a.result_json as string),
@@ -556,7 +556,7 @@ export function getMeta(db: Database) {
 }
 
 function getAnalysisStats(db: Database) {
-    const version = promptVersion();
+    const version = promptVersion(db);
     const totals = db
         .query<{ analyzed: number; outdated: number; cost: number | null }, [string]>(
             `SELECT COUNT(*) AS analyzed, SUM(${OUTDATED_SQL}) AS outdated, SUM(a.cost_usd) AS cost

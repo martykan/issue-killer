@@ -14,12 +14,14 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 const { values } = parseArgs({
-    options: { repo: { type: 'string' }, db: { type: 'string' }, github: { type: 'string', default: 'trezor/trezor-suite' } },
+    options: { repo: { type: 'string' }, db: { type: 'string' }, github: { type: 'string' } },
 });
 if (!values.repo || !values.db) throw new Error('--repo and --db are required');
 const repoPath = values.repo;
-const [owner, name] = values.github.split('/') as [string, string];
 const db = new Database(values.db, { readonly: true });
+// Default: the GitHub repo the DB was synced from.
+const githubRepo = values.github ?? db.query<{ value: string }, []>("SELECT value FROM sync_state WHERE key = 'repo'").get()?.value ?? 'trezor/trezor-suite';
+const [owner, name] = githubRepo.split('/') as [string, string];
 const token = process.env.GITHUB_TOKEN ?? Bun.spawnSync(['gh', 'auth', 'token']).stdout.toString().trim();
 
 const MAX_OUTPUT = 20_000;
@@ -97,7 +99,7 @@ server.registerTool(
     'search_issues',
     {
         description:
-            'Search the local copy of all trezor-suite issues (open and closed) by words in title/body. Use to find duplicates or related issues.',
+            'Search the local copy of all issues of the repository (open and closed) by words in title/body. Use to find duplicates or related issues.',
         inputSchema: {
             words: z.array(z.string().min(2).max(60)).min(1).max(6).describe('All words must match (title or body)'),
             state: z.enum(['open', 'closed', 'all']).optional(),
@@ -151,7 +153,7 @@ server.registerTool(
 server.registerTool(
     'get_pull_request',
     {
-        description: 'Get a trezor-suite pull request from GitHub: state, merge date, description and changed files.',
+        description: 'Get a pull request of the repository from GitHub: state, merge date, description and changed files.',
         inputSchema: { number: z.number().int().positive() },
     },
     async ({ number }) => {
@@ -174,7 +176,7 @@ server.registerTool(
 server.registerTool(
     'search_pull_requests',
     {
-        description: 'Search trezor-suite pull requests on GitHub by keywords (title/body). Returns number, state, merge date, title.',
+        description: 'Search pull requests of the repository on GitHub by keywords (title/body). Returns number, state, merge date, title.',
         inputSchema: {
             query: z.string().min(2).max(200),
             merged_only: z.boolean().optional(),

@@ -4,7 +4,16 @@ import type { HealthCheck, Meta, SyncStatus } from './types.ts';
 import { runJob } from './util.tsx';
 
 type ProjectChoice = { number: number; title: string };
-type SetupInfo = { repo: string | null; defaultRepo: string; projects: number[]; issues: number; repoPath: string; hasCheckout: boolean };
+type SetupInfo = {
+    repo: string | null;
+    defaultRepo: string;
+    projects: number[];
+    issues: number;
+    repoPath: string;
+    /** false: the user's own folder, read as it is. */
+    managedCheckout: boolean;
+    hasCheckout: boolean;
+};
 
 const STEPS = ['Tools', 'Data', 'Your team', 'Code checkout'] as const;
 const TOOL_CHECKS = ['bun', 'gh', 'github-auth', 'github-project-write', 'claude', 'git'];
@@ -29,7 +38,7 @@ export function SetupWizard({ meta, onDataChanged, onClose }: { meta: Meta | nul
         <div className="modal-backdrop">
             <div className="modal wizard" role="dialog" aria-modal="true">
                 <div className="wizard-head">
-                    <h2>Welcome to Issue Killer</h2>
+                    <h2>{meta?.repo ? `Set up ${meta.repo}` : 'Welcome to Issue Killer'}</h2>
                     <button className="link small" onClick={finish} title="You can rerun setup from Settings">
                         Skip setup
                     </button>
@@ -123,6 +132,7 @@ function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () =>
     const [project, setProject] = useState(info.projects[0] ? String(info.projects[0]) : '');
     const [choices, setChoices] = useState<ProjectChoice[]>([]);
     const [choicesError, setChoicesError] = useState<string | null>(null);
+    const [loadingChoices, setLoadingChoices] = useState(false);
     const [status, setStatus] = useState<SyncStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [continueAfterSync, setContinueAfterSync] = useState(false);
@@ -130,13 +140,22 @@ function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () =>
     // Projects linked to the repo; preselect the biggest one unless the configured project is among them.
     useEffect(() => {
         if (!/^[^/\s]+\/[^/\s]+$/.test(repo.trim())) return;
+        let cancelled = false;
+        setLoadingChoices(true);
         const t = setTimeout(async () => {
-            const body = (await (await fetch(`/api/setup/projects?repo=${encodeURIComponent(repo.trim())}`)).json()) as ProjectChoice[] | { error: string };
+            const body = (await fetch(`/api/setup/projects?repo=${encodeURIComponent(repo.trim())}`)
+                .then(r => r.json())
+                .catch((err: Error) => ({ error: err.message }))) as ProjectChoice[] | { error: string };
+            if (cancelled) return;
+            setLoadingChoices(false);
             setChoices(Array.isArray(body) ? body : []);
             setChoicesError(Array.isArray(body) ? null : body.error);
             if (Array.isArray(body) && body[0] && !body.some(p => info.projects.includes(p.number))) setProject(String(body[0].number));
         }, 400);
-        return () => clearTimeout(t);
+        return () => {
+            cancelled = true;
+            clearTimeout(t);
+        };
     }, [repo, info.projects]);
 
     useEffect(() => {
@@ -182,9 +201,11 @@ function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () =>
                     <input className="search" value={repo} onChange={e => setRepo(e.target.value)} disabled={!!info.repo} />
                 </label>
                 <label className="field-select">
-                    <span className="field-label">GitHub Project (Team/Status/Priority fields)</span>
-                    <select value={project} onChange={e => setProject(e.target.value)}>
-                        <option value="">None</option>
+                    <span className="field-label">
+                        GitHub Project (Team/Status/Priority fields) {loadingChoices && <span className="spinner" aria-label="Loading projects" />}
+                    </span>
+                    <select value={loadingChoices ? '' : project} onChange={e => setProject(e.target.value)} disabled={loadingChoices}>
+                        <option value="">{loadingChoices ? 'Loading projects…' : choices.length ? 'None' : 'None linked to this repo'}</option>
                         {choices.map(p => (
                             <option key={p.number} value={p.number}>
                                 {p.title} (#{p.number})
@@ -202,13 +223,13 @@ function DataStep({ info, onSynced, onNext }: { info: SetupInfo; onSynced: () =>
             )}
             {error && <p className="error">Sync failed: {error}</p>}
             <div className="modal-actions">
-                <button className={synced ? 'small-button' : 'primary-button'} onClick={() => start()} disabled={!!status?.running || !repo.includes('/')}>
+                <button className={synced ? 'small-button' : 'primary-button'} onClick={() => start()} disabled={!!status?.running || loadingChoices || !repo.includes('/')}>
                     {synced ? 'Sync again' : 'Start first sync'}
                 </button>
                 <button
                     className={synced ? 'primary-button' : 'small-button'}
                     onClick={synced && projectChanged ? () => start(true) : onNext}
-                    disabled={!!status?.running}
+                    disabled={!!status?.running || loadingChoices}
                 >
                     {!synced ? 'Continue without data' : projectChanged ? 'Sync & continue' : 'Continue'}
                 </button>
@@ -281,10 +302,14 @@ function CheckoutStep({ info, onDone, onCloned }: { info: SetupInfo; onDone: () 
         <>
             <p>
                 <b>Investigate</b> and <b>Ask with code</b> let a sandboxed, read-only Claude agent look at the code and git history. They
-                need a local checkout of the repo (blob-less clone, ~800 MB). Optional – everything else works without it.
+                need a local checkout of the repo. Optional – everything else works without it.
             </p>
-            <p className="muted small">Location: {info.repoPath}</p>
+            <p className="muted small">
+                Location: {info.repoPath}
+                {!info.managedCheckout && ' (your folder, read-only)'}
+            </p>
             {info.hasCheckout && <p className="ok-line">✓ Checkout present.</p>}
+            {!info.hasCheckout && !info.managedCheckout && <p className="error">Not a git checkout.</p>}
             {cloning && (
                 <p className="muted">
                     <span className="spinner" /> Cloning… (a minute or two)
@@ -292,7 +317,7 @@ function CheckoutStep({ info, onDone, onCloned }: { info: SetupInfo; onDone: () 
             )}
             {error && <p className="error">{error}</p>}
             <div className="modal-actions">
-                {!info.hasCheckout && (
+                {!info.hasCheckout && info.managedCheckout && (
                     <button className="small-button" onClick={clone} disabled={cloning}>
                         Clone now
                     </button>

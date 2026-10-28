@@ -18,17 +18,18 @@ export type Settings = {
 const DEFAULTS: Settings = { myTeam: null, myProjectTeam: null, setupDone: false, conductorRepoPath: null };
 const KEYS = Object.keys(DEFAULTS) as (keyof Settings)[];
 
-// Loaded once per process (openDb) and on every update, so code without a DB handle can read it.
-let cache: Settings = { ...DEFAULTS };
+// Each workspace (repository) has its own DB and settings; cached per DB handle, refreshed on every update.
+const cache = new WeakMap<Database, Settings>();
 
 export function loadSettings(db: Database): Settings {
     const rows = db.query<{ key: string; value: string }, []>('SELECT key, value FROM settings').all();
-    cache = { ...DEFAULTS };
-    for (const r of rows) if ((KEYS as string[]).includes(r.key)) (cache as Record<string, unknown>)[r.key] = JSON.parse(r.value);
-    return cache;
+    const settings = { ...DEFAULTS };
+    for (const r of rows) if ((KEYS as string[]).includes(r.key)) (settings as Record<string, unknown>)[r.key] = JSON.parse(r.value);
+    cache.set(db, settings);
+    return settings;
 }
 
-export const getSettings = (): Settings => cache;
+export const getSettings = (db: Database): Settings => cache.get(db) ?? loadSettings(db);
 
 export function updateSettings(db: Database, patch: Partial<Settings>): Settings {
     const upsert = db.query('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');

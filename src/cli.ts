@@ -7,6 +7,7 @@ import { getSettings, type Settings, updateSettings } from './settings.ts';
 import { DEFAULT_INVESTIGATE_MODEL, DEFAULT_REPO_PATH, investigateBatch } from './investigate.ts';
 import { GitHubClient, resolveToken } from './github.ts';
 import { syncRepo } from './sync.ts';
+import { DEFAULT_DATA_DIR, WorkspaceRegistry } from './workspaces.ts';
 
 const USAGE = `Usage: bun src/cli.ts <command> [options]
 
@@ -22,7 +23,9 @@ Commands:
             --conductor-repo-path <path>  (repo root as added in Conductor, for "Hand off to Conductor")
 
 Options:
-  --repo <owner/name>   Repository (default: trezor/trezor-suite)
+  --workspace <id>      A repository added in the app (id or owner/name, see ${DEFAULT_DATA_DIR}/workspaces.json):
+                        uses its DB, repo and code checkout instead of --db / --repo / --repo-path
+  --repo <owner/name>   Repository (default: the one the DB was synced from, else trezor/trezor-suite)
   --db <path>           SQLite file (default: ${DEFAULT_DB_PATH})
 
 sync:
@@ -43,7 +46,7 @@ analyze:
 investigate (same --filter/--issue/--limit/--model/--budget/--force/--dry-run as analyze):
                         Default selection: open issues Claude triage recommends closing, or with a merged closing PR
   --concurrency <n>     Parallel agents (default for investigate: 2)
-  --repo-path <path>    Read-only trezor-suite checkout (default: ${DEFAULT_REPO_PATH})
+  --repo-path <path>    Read-only code checkout (default: ${DEFAULT_REPO_PATH})
 
 close-proposed:
   --min-confidence <c>  high (default) | medium | low
@@ -54,7 +57,8 @@ close-proposed:
 const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
-        repo: { type: 'string', default: 'trezor/trezor-suite' },
+        workspace: { type: 'string' },
+        repo: { type: 'string' },
         db: { type: 'string', default: DEFAULT_DB_PATH },
         full: { type: 'boolean', default: false },
         'page-size': { type: 'string', default: '50' },
@@ -84,12 +88,16 @@ if (values.help || !command) {
     process.exit(command || values.help ? 0 : 1);
 }
 
-const db = openDb(values.db);
+const workspace = values.workspace ? findWorkspace(values.workspace) : null;
+const dbPath = workspace?.dbPath ?? values.db;
+const repoPath = workspace?.checkoutPath ?? values['repo-path'];
+const db = openDb(dbPath);
 
 switch (command) {
     case 'sync': {
-        const [owner, name] = values.repo.split('/');
-        if (!owner || !name) throw new Error(`Invalid --repo: ${values.repo}`);
+        const repo = values.repo ?? workspace?.repo ?? getState(db, 'repo') ?? 'trezor/trezor-suite';
+        const [owner, name] = repo.split('/');
+        if (!owner || !name) throw new Error(`Invalid --repo: ${repo}`);
         const gh = new GitHubClient(await resolveToken());
         const result = await syncRepo(db, gh, {
             owner,
@@ -125,8 +133,9 @@ switch (command) {
             limit: values.limit ? Number(values.limit) : undefined,
             concurrency: Number(values.concurrency ?? 2),
             model: values.model ?? DEFAULT_INVESTIGATE_MODEL,
-            repoPath: values['repo-path'],
-            dbPath: values.db,
+            repoPath,
+            managed: workspace?.managed ?? true,
+            dbPath,
             budgetUsd: values.budget ? Number(values.budget) : undefined,
             force: values.force,
             dryRun: values['dry-run'],
@@ -169,7 +178,7 @@ switch (command) {
         printStatus();
         break;
     case 'doctor': {
-        const checks = await runChecks(db, { repoPath: values['repo-path'] });
+        const checks = await runChecks(db, { repoPath });
         const icon = { ok: '✓', warn: '!', error: '✗' } as const;
         for (const c of checks) {
             console.log(`${icon[c.status]} ${c.label.padEnd(26)} ${c.detail}`);
@@ -188,13 +197,20 @@ switch (command) {
         }
         if (values['my-project-team'] !== undefined) patch.myProjectTeam = values['my-project-team'] || null;
         if (values['conductor-repo-path'] !== undefined) patch.conductorRepoPath = values['conductor-repo-path'] || null;
-        const settings = Object.keys(patch).length ? updateSettings(db, patch) : getSettings();
+        const settings = Object.keys(patch).length ? updateSettings(db, patch) : getSettings(db);
         console.log(JSON.stringify(settings, null, 2));
         break;
     }
     default:
         console.error(`Unknown command: ${command}\n\n${USAGE}`);
         process.exit(1);
+}
+
+function findWorkspace(idOrRepo: string) {
+    const registry = new WorkspaceRegistry(DEFAULT_DATA_DIR, { dbPath: DEFAULT_DB_PATH, repoPath: DEFAULT_REPO_PATH });
+    const ws = registry.get(idOrRepo) ?? registry.findRepo(idOrRepo);
+    if (!ws) throw new Error(`Unknown workspace "${idOrRepo}". Known: ${registry.list().map(w => w.repo ?? w.id).join(', ')}`);
+    return ws;
 }
 
 function printStatus() {
