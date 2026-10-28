@@ -72,7 +72,7 @@ export async function askQuestion(
         ...(history.length
             ? ['\n## Earlier questions about this issue', ...history.map(h => `\n**Q:** ${h.question}\n\n**A:** ${h.answer}`)]
             : []),
-        opts.mode === 'code' && opts.repoSha ? `\n---\nThe checkout is at develop ${opts.repoSha}.` : '',
+        opts.mode === 'code' && opts.repoSha ? `\n---\nThe checkout is at commit ${opts.repoSha}.` : '',
         `\n---\n## Question\n\n${question}`,
     ].join('\n');
 

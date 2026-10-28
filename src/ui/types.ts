@@ -16,6 +16,9 @@ export type Meta = {
     investigations: { total: number; proposedClose: number | null; cost: number | null };
     projects: ProjectStats[];
     settings: Settings;
+    /** Current workspace (repository added to the app) and its code checkout. */
+    workspace: string;
+    checkoutPath: string;
 };
 
 export type Settings = { myTeam: string | null; myProjectTeam: string | null; setupDone: boolean; conductorRepoPath: string | null };

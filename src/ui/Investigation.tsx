@@ -37,9 +37,11 @@ type Props = {
     actions: IssueAction[];
     onOpenIssue: (n: number) => void;
     onClosed: () => void;
+    /** Code checkout the agent works in (its transcripts are resumable from there). */
+    checkoutPath?: string;
 };
 
-export function InvestigationPanel({ number, isOpen, initial, actions, onOpenIssue, onClosed }: Props) {
+export function InvestigationPanel({ number, isOpen, initial, actions, onOpenIssue, onClosed, checkoutPath }: Props) {
     const [inv, setInv] = useState(initial);
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -125,12 +127,12 @@ export function InvestigationPanel({ number, isOpen, initial, actions, onOpenIss
                         <CloseForm number={number} inv={inv} onOpenIssue={onOpenIssue} onClosed={onClosed} />
                     )}
                     <div className="muted small">
-                        {inv.model} · develop@{inv.repoSha} · {inv.numTurns} turns · {timeAgo(inv.investigatedAt)}
+                        {inv.model} · @{inv.repoSha} · {inv.numTurns} turns · {timeAgo(inv.investigatedAt)}
                         {inv.costUsd != null && ` · $${inv.costUsd.toFixed(2)}`}
                         {inv.sessionId && (
                             <span title="Inspect the agent's full transcript">
                                 {' · '}
-                                <code>cd data/trezor-suite && claude --resume {inv.sessionId}</code>
+                                <code>cd {checkoutPath ?? '<checkout>'} && claude --resume {inv.sessionId}</code>
                             </span>
                         )}
                         {inv.outdated && <span className="outdated"> · outdated (issue changed since)</span>}

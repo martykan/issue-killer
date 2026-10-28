@@ -56,7 +56,7 @@ function saveAnalysis(
         r.effort,
         JSON.stringify(r),
         meta.model,
-        promptVersion(),
+        promptVersion(db),
         meta.issueUpdatedAt,
         meta.costUsd,
         meta.durationMs,
@@ -82,7 +82,7 @@ export function selectIssues(db: Database, opts: Pick<BatchOptions, 'filter' | '
     prepareTempTables(db);
     if (opts.issues.length) return opts.issues;
 
-    const { where, args } = buildFilter(new URLSearchParams(opts.filter));
+    const { where, args } = buildFilter(db, new URLSearchParams(opts.filter));
     const pending = opts.force
         ? ''
         : `${where ? 'AND' : 'WHERE'} NOT EXISTS (SELECT 1 FROM issue_analysis a WHERE a.issue_number = i.number
@@ -91,14 +91,14 @@ export function selectIssues(db: Database, opts: Pick<BatchOptions, 'filter' | '
         .query<{ number: number }, (string | number)[]>(
             `SELECT i.number FROM issues i ${where} ${pending} ORDER BY i.updated_at DESC ${opts.limit ? `LIMIT ${opts.limit}` : ''}`,
         )
-        .all(...args, ...(opts.force ? [] : [promptVersion()]))
+        .all(...args, ...(opts.force ? [] : [promptVersion(db)]))
         .map(r => r.number);
 }
 
 export async function analyzeBatch(db: Database, opts: BatchOptions) {
     const log = opts.log ?? console.log;
     const numbers = selectIssues(db, opts);
-    log(`${numbers.length} issues to analyze with ${opts.model} (prompt ${promptVersion()})`);
+    log(`${numbers.length} issues to analyze with ${opts.model} (prompt ${promptVersion(db)})`);
     if (opts.dryRun || !numbers.length) return { done: 0, failed: 0, costUsd: 0 };
 
     const systemPrompt = buildSystemPrompt(db);

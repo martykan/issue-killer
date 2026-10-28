@@ -82,20 +82,24 @@ export function investigationPromptVersion() {
         .slice(0, 10);
 }
 
-/** Fast-forwards the dedicated read-only checkout to the latest develop. Returns the HEAD sha. */
-export async function updateRepo(repoPath: string): Promise<string> {
+/**
+ * Fast-forwards an app-managed checkout (hard reset to its branch on origin); a user's own folder (`managed: false`) is
+ * used as it is. Returns the HEAD sha.
+ */
+export async function updateRepo(repoPath: string, { managed = true } = {}): Promise<string> {
     if (!existsSync(join(repoPath, '.git'))) {
-        throw new Error(
-            `No checkout at ${repoPath}. Create it with:\n  git clone --filter=blob:none --single-branch --branch develop https://github.com/trezor/trezor-suite.git ${repoPath}`,
-        );
+        throw new Error(`No code checkout at ${repoPath}. Clone it in Settings → Run setup wizard → Code checkout.`);
     }
     const git = (...args: string[]) => {
         const p = Bun.spawnSync(['git', '-C', repoPath, ...args], { env: process.env });
         if (p.exitCode !== 0) throw new Error(`git ${args.join(' ')} failed: ${p.stderr.toString().trim()}`);
         return p.stdout.toString().trim();
     };
-    git('fetch', '--quiet', 'origin', 'develop');
-    git('reset', '--quiet', '--hard', 'origin/develop');
+    if (managed) {
+        const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
+        git('fetch', '--quiet', 'origin', branch);
+        git('reset', '--quiet', '--hard', `origin/${branch}`);
+    }
     return git('rev-parse', '--short', 'HEAD');
 }
 
@@ -118,7 +122,7 @@ export async function investigateIssue(
         analysis
             ? `\n## Earlier triage note (thread-only, unverified)\n\n${analysis.summary}\nRecommendation: ${analysis.recommendation} – ${analysis.reasoning}`
             : '',
-        `\n---\nThe checkout is at develop ${opts.repoSha}. Investigate issue #${number} and return your verdict.`,
+        `\n---\nThe checkout is at commit ${opts.repoSha}. Investigate issue #${number} and return your verdict.`,
     ].join('\n');
 
     const run = await runClaude<InvestigationResult>({
@@ -168,6 +172,8 @@ export type InvestigateBatchOptions = {
     concurrency: number;
     model: string;
     repoPath: string;
+    /** App-managed checkout, reset to origin before the run; false = the user's own folder, used as is. */
+    managed?: boolean;
     dbPath: string;
     force: boolean;
     budgetUsd?: number;
@@ -183,7 +189,7 @@ export function selectForInvestigation(db: Database, opts: Pick<InvestigateBatch
     prepareTempTables(db);
     if (opts.issues.length) return opts.issues;
     const params = new URLSearchParams(opts.filter);
-    const { where, args } = buildFilter(params);
+    const { where, args } = buildFilter(db, params);
     const conditions = [where ? where.replace(/^WHERE /, '') : '1'];
     if (!params.has('rec') && !params.has('signal')) {
         conditions.push(`(EXISTS (SELECT 1 FROM issue_analysis a WHERE a.issue_number = i.number AND a.recommendation LIKE 'close_%')
@@ -206,8 +212,8 @@ export async function investigateBatch(db: Database, opts: InvestigateBatchOptio
     log(`${numbers.length} issues to investigate with ${opts.model}`);
     if (opts.dryRun || !numbers.length) return { done: 0, failed: 0, costUsd: 0 };
 
-    const repoSha = await updateRepo(opts.repoPath);
-    log(`Checkout ${opts.repoPath} at develop ${repoSha}`);
+    const repoSha = await updateRepo(opts.repoPath, { managed: opts.managed });
+    log(`Checkout ${opts.repoPath} at ${repoSha}`);
 
     const queue = [...numbers];
     let done = 0;

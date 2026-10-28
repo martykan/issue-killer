@@ -98,6 +98,7 @@ export function IssueDetailPane({ number, meta, update, onClose, reloadKey, onCh
                         actions={issue.actions}
                         onOpenIssue={openIssue}
                         onClosed={() => onChanged?.()}
+                        checkoutPath={meta?.checkoutPath}
                     />
                     <AskPanel number={issue.number} initial={issue.questions} />
 

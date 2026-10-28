@@ -28,9 +28,15 @@ const { startServer } = await import('../app-server.ts');
 // A fixed port keeps the UI origin stable, so localStorage (remembered team, sidebar state) survives restarts.
 const PREFERRED_PORT = 47815;
 const serverOptions = {
+    dataDir,
+    // The first workspace (repository); more are added from the workspace switcher into dataDir/workspaces.
     dbPath: join(dataDir, 'issues.db'),
     repoPath: join(dataDir, 'trezor-suite'),
     ui: { staticDir: join(resources, 'ui') },
+    pickFolder: async () => {
+        const [path] = (await Utils.openFileDialog({ canChooseFiles: false, canChooseDirectory: true, allowsMultipleSelection: false })).filter(Boolean);
+        return path ?? null;
+    },
 };
 let server: ReturnType<typeof startServer>;
 try {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import type { UpdateParams } from './App.tsx';
 import type { Meta } from './types.ts';
 import { saveSettings } from './settings.ts';
@@ -57,10 +57,12 @@ type Summary = {
     generatedAt: string;
 };
 
-const REPO_URL = 'https://github.com/trezor/trezor-suite';
+/** owner/name of the workspace's repository, for issue links in Claude's summaries. */
+const RepoContext = createContext<string | null>(null);
 /** Makes #1234 references clickable (GitHub redirects /issues/N to the PR when N is a PR). */
-const linkRefs = (text: string) => text.replace(/(^|[^\w[/])#(\d{2,6})\b/g, (_, pre, n) => `${pre}[#${n}](${REPO_URL}/issues/${n})`);
-const Md = ({ text }: { text: string }) => <Markdown source={linkRefs(text)} />;
+const linkRefs = (text: string, repo: string | null) =>
+    repo ? text.replace(/(^|[^\w[/])#(\d{2,6})\b/g, (_, pre, n) => `${pre}[#${n}](https://github.com/${repo}/issues/${n})`) : text;
+const Md = ({ text }: { text: string }) => <Markdown source={linkRefs(text, useContext(RepoContext))} />;
 
 const COLUMNS: { key: Column; label: string; hint: string }[] = [
     { key: 'todo', label: 'To do', hint: 'Assigned issues with project status To do / Blocked / not set, and no open PR' },
@@ -113,52 +115,54 @@ export function BoardView({ meta, params, update, reloadKey }: { meta: Meta | nu
     }, [data]);
 
     return (
-        <div className="board">
-            <header className="board-head">
-                <div>
-                    <h2>Board</h2>
-                    <div className="muted small">
-                        Assigned issues and open PRs per person{data?.lastSyncAt && ` · synced ${timeAgo(data.lastSyncAt)}`}
-                    </div>
-                </div>
-                <span className="grow" />
-                <button className="small-button" onClick={summarize} disabled={summarizing || !data} title="Claude writes a team summary and next steps per person (~30s)">
-                    {summarizing ? (
-                        <>
-                            <span className="spinner" /> Summarizing…
-                        </>
-                    ) : data?.summary ? (
-                        '✨ Refresh summary'
-                    ) : (
-                        '✨ Summarize'
-                    )}
-                </button>
-                <select value={data?.team.slug ?? team} onChange={e => setTeam(e.target.value)} title="GitHub team whose members are shown (remembered as your team)">
-                    {meta?.teams.map(t => (
-                        <option key={t.slug} value={t.slug}>
-                            {t.name} ({t.members})
-                        </option>
-                    ))}
-                </select>
-            </header>
-            {error && <div className="error">{error}</div>}
-            {summaryError && <div className="error">Summary failed: {summaryError}</div>}
-            {loading && !data && <div className="muted">Loading…</div>}
-            {data?.summary && <TeamSummary summary={data.summary} />}
-            {data && (
-                <div className="board-grid">
-                    <div className="board-colhead" />
-                    {COLUMNS.map(c => (
-                        <div key={c.key} className="board-colhead" title={c.hint}>
-                            {c.label} <span className="muted">{totals[c.key]}</span>
+        <RepoContext.Provider value={meta?.repo ?? null}>
+            <div className="board">
+                <header className="board-head">
+                    <div>
+                        <h2>Board</h2>
+                        <div className="muted small">
+                            Assigned issues and open PRs per person{data?.lastSyncAt && ` · synced ${timeAgo(data.lastSyncAt)}`}
                         </div>
-                    ))}
-                    {data.members.map(m => (
-                        <MemberRow key={m.login} member={m} openIssue={openIssue} note={data.summary?.members.find(s => s.login === m.login)} />
-                    ))}
-                </div>
-            )}
-        </div>
+                    </div>
+                    <span className="grow" />
+                    <button className="small-button" onClick={summarize} disabled={summarizing || !data} title="Claude writes a team summary and next steps per person (~30s)">
+                        {summarizing ? (
+                            <>
+                                <span className="spinner" /> Summarizing…
+                            </>
+                        ) : data?.summary ? (
+                            '✨ Refresh summary'
+                        ) : (
+                            '✨ Summarize'
+                        )}
+                    </button>
+                    <select value={data?.team.slug ?? team} onChange={e => setTeam(e.target.value)} title="GitHub team whose members are shown (remembered as your team)">
+                        {meta?.teams.map(t => (
+                            <option key={t.slug} value={t.slug}>
+                                {t.name} ({t.members})
+                            </option>
+                        ))}
+                    </select>
+                </header>
+                {error && <div className="error">{error}</div>}
+                {summaryError && <div className="error">Summary failed: {summaryError}</div>}
+                {loading && !data && <div className="muted">Loading…</div>}
+                {data?.summary && <TeamSummary summary={data.summary} />}
+                {data && (
+                    <div className="board-grid">
+                        <div className="board-colhead" />
+                        {COLUMNS.map(c => (
+                            <div key={c.key} className="board-colhead" title={c.hint}>
+                                {c.label} <span className="muted">{totals[c.key]}</span>
+                            </div>
+                        ))}
+                        {data.members.map(m => (
+                            <MemberRow key={m.login} member={m} openIssue={openIssue} note={data.summary?.members.find(s => s.login === m.login)} />
+                        ))}
+                    </div>
+                )}
+            </div>
+        </RepoContext.Provider>
     );
 }
 

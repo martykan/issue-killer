@@ -2,10 +2,12 @@ import { parseArgs } from 'node:util';
 import { startServer } from './app-server.ts';
 import { DEFAULT_DB_PATH } from './db.ts';
 import { DEFAULT_REPO_PATH } from './investigate.ts';
+import { DEFAULT_DATA_DIR } from './workspaces.ts';
 import index from './ui/index.html';
 
 const { values } = parseArgs({
     options: {
+        'data-dir': { type: 'string', default: DEFAULT_DATA_DIR },
         db: { type: 'string', default: DEFAULT_DB_PATH },
         port: { type: 'string', default: process.env.PORT ?? '3000' },
         repo: { type: 'string' },
@@ -14,6 +16,7 @@ const { values } = parseArgs({
 });
 
 const server = startServer({
+    dataDir: values['data-dir'],
     dbPath: values.db,
     repoPath: values['repo-path'],
     port: Number(values.port),

@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { getState } from './db.ts';
 import { resolveToken } from './github.ts';
 import { getSettings } from './settings.ts';
 
@@ -130,13 +131,13 @@ function claudeCheck(): Check {
     };
 }
 
-function dataChecks(db: Database, repoPath: string): Check[] {
+function dataChecks(db: Database, repoPath: string, repo: string | null): Check[] {
     const count = (sql: string) => db.query<{ n: number }, []>(sql).get()?.n ?? 0;
     const issues = count('SELECT COUNT(*) n FROM issues');
     const lastSync = db.query<{ value: string }, []>("SELECT value FROM sync_state WHERE key = 'last_sync_at'").get()?.value;
     const projects = count('SELECT COUNT(*) n FROM projects');
     const members = count('SELECT COUNT(*) n FROM org_members');
-    const settings = getSettings();
+    const settings = getSettings(db);
     const git = run(['git', '--version']);
     return [
         {
@@ -179,7 +180,7 @@ function dataChecks(db: Database, repoPath: string): Check[] {
             detail: existsSync(join(repoPath, '.git')) ? repoPath : `missing at ${repoPath}`,
             fix: existsSync(join(repoPath, '.git'))
                 ? undefined
-                : `git clone --filter=blob:none --single-branch --branch develop https://github.com/trezor/trezor-suite.git "${repoPath}"`,
+                : `git clone --filter=blob:none --single-branch https://github.com/${repo ?? 'trezor/trezor-suite'}.git "${repoPath}"`,
         },
         {
             id: 'settings',
@@ -192,7 +193,7 @@ function dataChecks(db: Database, repoPath: string): Check[] {
     ];
 }
 
-export async function runChecks(db: Database, opts: { repoPath: string }): Promise<Check[]> {
+export async function runChecks(db: Database, opts: { repoPath: string; repo?: string | null }): Promise<Check[]> {
     const bunVersion = Bun.version;
     const bunOk = Number(bunVersion.split('.')[0]) > 1 || Number(bunVersion.split('.')[1]) >= 3;
     return [
@@ -206,6 +207,6 @@ export async function runChecks(db: Database, opts: { repoPath: string }): Promi
         },
         ...(await githubCheck()),
         claudeCheck(),
-        ...dataChecks(db, opts.repoPath),
+        ...dataChecks(db, opts.repoPath, opts.repo ?? getState(db, 'repo') ?? null),
     ];
 }

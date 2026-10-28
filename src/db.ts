@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS issue_investigations (
     result_json      TEXT NOT NULL,
     model            TEXT NOT NULL,
     prompt_version   TEXT NOT NULL,
-    repo_sha         TEXT NOT NULL,               -- develop commit the agent looked at
+    repo_sha         TEXT NOT NULL,               -- checkout commit the agent looked at
     session_id       TEXT,                        -- resume the transcript: cd data/trezor-suite && claude --resume <id>
     issue_updated_at TEXT NOT NULL,
     cost_usd         REAL,

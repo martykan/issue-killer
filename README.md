@@ -18,6 +18,19 @@ from a local copy of GitHub data, with Claude doing the reading.
 Nothing is tied to one team: on first start a setup wizard checks your tools, runs the first sync and asks which
 team you're on; that (and other preferences) is stored in the local DB and can be changed under ⚙ Settings.
 
+## Multiple repositories
+
+Switch repositories in the top bar; each has its own DB, settings and code checkout. *Add or remove repositories…*:
+
+- **Local folder** – pick an existing clone; the GitHub repo is detected from its remotes (`upstream` before `origin`).
+  The folder is only read, never changed.
+- **Clone from URL** – `https://github.com/owner/name`, `git@github.com:owner/name.git` or `owner/name`; cloned into
+  the data folder and kept up to date by the app.
+
+Repositories are listed in `workspaces.json` in the data folder, their data lives in `workspaces/<id>/`. The existing
+`issues.db` is the first repository. CLI: `--workspace owner/name`. The prompts in `prompts/` are still trezor-suite
+specific.
+
 ## Download (macOS app)
 
 CI builds the desktop app on every push and pull request (`.github/workflows/desktop.yml`):
@@ -117,11 +130,13 @@ The stable build is a compressed self-extracting stub: the first launch unpacks 
 window), later launches start directly. Electrobun also keeps an uninstaller and cached archive in
 `~/Library/Application Support/com.satoshilabs.issue-killer/`.
 
-- Data lives in `~/Library/Application Support/Issue Killer` (`issues.db`, and `trezor-suite/` for Investigate).
+- Data lives in `~/Library/Application Support/Issue Killer` (`issues.db`, and `trezor-suite/` for Investigate;
+  other repositories in `workspaces.json` + `workspaces/<id>/`).
   Point it elsewhere with `ISSUE_KILLER_DATA`, or share the CLI's data by symlinking that folder to the repo's
   `data/` folder (`ln -s "$PWD/data" ~/Library/Application\ Support/Issue\ Killer`, with the app quit).
 - The app uses your login shell's `PATH`, so `gh`, `git` and `claude` work as in the terminal.
 - `scripts/prepare-desktop.ts` (pre-build hook) bundles the UI, the investigation MCP server and the prompts into the app.
+- `scripts/finish-desktop.ts` (post-build hook) sets the About panel's version, author and GitHub link.
 
 ## Analyze with Claude
 
@@ -235,6 +250,7 @@ src/
   planning.ts, plan-actions.ts     Plan view, draft changes, apply to GitHub, Claude suggestions
   pulls.ts            open pull request sync
   settings.ts, doctor.ts           preferences, setup check
+  workspaces.ts       repositories added to the app (registry, GitHub remote detection, clone)
   actions.ts          closing issues on GitHub (+ audit log)
   claude.ts           headless `claude -p` wrapper (restricted mode, JSON schema)
   ui/                 React UI

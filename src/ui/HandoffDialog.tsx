@@ -43,7 +43,7 @@ export function HandoffDialog({ number, onClose, onOpenSettings }: { number: num
                     {repoPath ? <code>{repoPath}</code> : <>your first repository</>}
                     {' · '}
                     <button className="link small" onClick={onOpenSettings}>
-                        {repoPath ? 'change' : 'set the trezor-suite repo path in Settings'}
+                        {repoPath ? 'change' : 'set the repository path in Settings'}
                     </button>
                 </p>
                 <textarea className="ask-input handoff-prompt" rows={16} value={prompt} onChange={e => setPrompt(e.target.value)} />

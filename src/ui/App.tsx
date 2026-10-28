@@ -11,6 +11,7 @@ import { Sidebar } from './Sidebar.tsx';
 import { SyncButton } from './SyncButton.tsx';
 import { TeamSwitcher, useRememberedTeam } from './TeamSwitcher.tsx';
 import { TeamsDashboard } from './TeamsDashboard.tsx';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher.tsx';
 import type { IssueList, Meta } from './types.ts';
 import { useFetch } from './util.tsx';
 
@@ -98,6 +99,7 @@ export function App() {
         <div className={`app${view !== 'issues' ? ' teams-view' : ''}`}>
             <header className="topbar">
                 <strong className="app-name">Issue Killer</strong>
+                <WorkspaceSwitcher meta={meta.data} />
                 <div className="segmented view-toggle">
                     <button className={view === 'issues' ? 'active' : ''} onClick={() => update(p => p.delete('view'), { push: true })}>
                         Issues
