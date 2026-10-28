@@ -1,10 +1,11 @@
 import type { ElectrobunConfig } from 'electrobun';
+import pkg from './package.json';
 
 export default {
     app: {
         name: 'Issue Killer',
         identifier: 'com.satoshilabs.issue-killer',
-        version: '0.1.0',
+        version: pkg.version,
     },
     build: {
         mainProcess: 'bun',
@@ -26,5 +27,6 @@ export default {
     },
     scripts: {
         preBuild: 'scripts/prepare-desktop.ts',
+        postBuild: 'scripts/finish-desktop.ts',
     },
 } satisfies ElectrobunConfig;

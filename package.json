@@ -1,6 +1,9 @@
 {
   "name": "issue-killer",
   "private": true,
+  "version": "0.1.0",
+  "author": "Tomáš Martykán",
+  "repository": "github:martykan/issue-killer",
   "type": "module",
   "scripts": {
     "sync": "bun src/cli.ts sync",
